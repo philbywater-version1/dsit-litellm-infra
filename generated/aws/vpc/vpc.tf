@@ -5,7 +5,7 @@ resource "aws_vpc" "tfer--vpc-0b5fd89b4223abdc9" {
   enable_dns_support                   = "true"
   enable_network_address_usage_metrics = "false"
   instance_tenancy                     = "default"
-  ipv6_netmask_length                  = "0"
+
 
   tags = {
     Description  = "AI Engineering Lab"

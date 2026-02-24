@@ -26,6 +26,22 @@ import-all: ## Run terraformer import for all resource types in REGION
 		--resources="$(RESOURCES)" \
 		--regions="$(REGION)"
 
+# ── Deploy ────────────────────────────────────────────────────────────────────
+.PHONY: deploy-all
+deploy-all: ## Apply all modules in dependency order (vpc → subnet → ... → ecs/rds)
+	@chmod +x deploy.sh
+	./deploy.sh
+
+.PHONY: deploy-all-auto
+deploy-all-auto: ## Apply all modules non-interactively (--auto-approve)
+	@chmod +x deploy.sh
+	./deploy.sh --auto-approve
+
+.PHONY: plan-all
+plan-all: ## Plan all modules in dependency order (no apply)
+	@chmod +x deploy.sh
+	./deploy.sh --plan-only
+
 # ── Terraform ─────────────────────────────────────────────────────────────────
 .PHONY: init
 init: ## Terraform init at project root

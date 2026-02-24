@@ -1,0 +1,11 @@
+# backend.hcl — Partial S3 backend configuration shared by all modules.
+#
+# Copy to backend.hcl, fill in real values, then run:
+#   terraform -chdir=generated/aws/<module> init -backend-config=../../../backend.hcl
+#
+# Or use deploy.sh which passes this automatically.
+
+bucket         = "<your-tfstate-s3-bucket>"   # matches TF_STATE_BUCKET in .env
+region         = "eu-west-2"
+dynamodb_table = "<your-tfstate-dynamodb-lock-table>"   # matches TF_STATE_DYNAMODB_TABLE in .env
+encrypt        = true
