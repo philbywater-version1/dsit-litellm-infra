@@ -16,7 +16,6 @@ resource "aws_iam_role" "tfer--dsit-litellm-fg-bedrock-role" {
 POLICY
 
   description          = "Allows ECS tasks to call AWS services on your behalf."
-  managed_policy_arns  = ["arn:aws:iam::aws:policy/AmazonBedrockLimitedAccess"]
   max_session_duration = "3600"
   name                 = "dsit-litellm-fg-bedrock-role"
   path                 = "/"
@@ -58,7 +57,6 @@ resource "aws_iam_role" "tfer--dsit-litellm-gateway-main-task-admin" {
 }
 POLICY
 
-  managed_policy_arns  = ["arn:aws:iam::aws:policy/AdministratorAccess"]
   max_session_duration = "3600"
   name                 = "dsit-litellm-gateway-main-task-admin"
   path                 = "/"
@@ -100,7 +98,6 @@ resource "aws_iam_role" "tfer--dsit-litellm-gateway-main-task-execution-role" {
 }
 POLICY
 
-  managed_policy_arns  = ["arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"]
   max_session_duration = "3600"
   name                 = "dsit-litellm-gateway-main-task-execution-role"
   path                 = "/"
@@ -142,7 +139,6 @@ resource "aws_iam_role" "tfer--dsit-task-execution-role" {
 }
 POLICY
 
-  managed_policy_arns  = ["arn:aws:iam::aws:policy/AmazonSSMFullAccess", "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"]
   max_session_duration = "3600"
   name                 = "dsit-task-execution-role"
   path                 = "/"
@@ -158,4 +154,29 @@ POLICY
     Organisation = "DSIT"
     Title        = "AIEL"
   }
+}
+
+resource "aws_iam_role_policy_attachment" "tfer--dsit-litellm-fg-bedrock-role-bedrock" {
+  role       = aws_iam_role.tfer--dsit-litellm-fg-bedrock-role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonBedrockLimitedAccess"
+}
+
+resource "aws_iam_role_policy_attachment" "tfer--dsit-litellm-gateway-main-task-admin-admin" {
+  role       = aws_iam_role.tfer--dsit-litellm-gateway-main-task-admin.name
+  policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
+}
+
+resource "aws_iam_role_policy_attachment" "tfer--dsit-litellm-gateway-main-task-execution-role-ecs" {
+  role       = aws_iam_role.tfer--dsit-litellm-gateway-main-task-execution-role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+resource "aws_iam_role_policy_attachment" "tfer--dsit-task-execution-role-ssm" {
+  role       = aws_iam_role.tfer--dsit-task-execution-role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMFullAccess"
+}
+
+resource "aws_iam_role_policy_attachment" "tfer--dsit-task-execution-role-ecs" {
+  role       = aws_iam_role.tfer--dsit-task-execution-role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }

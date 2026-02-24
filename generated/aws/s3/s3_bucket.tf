@@ -81,7 +81,6 @@ POLICY
 
 resource "aws_s3_bucket" "tfer--terraform-20260224132347096200000001" {
   bucket        = "terraform-20260224132347096200000001"
-  bucket_prefix = "terraform-"
   force_destroy = "false"
 
   grant {

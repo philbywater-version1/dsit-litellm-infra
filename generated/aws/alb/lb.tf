@@ -2,6 +2,7 @@ resource "aws_lb" "tfer--dsit-llmlite-gateway-main-alb" {
   client_keep_alive = "3600"
 
   connection_logs {
+    bucket  = ""
     enabled = "false"
   }
 
