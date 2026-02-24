@@ -34,7 +34,6 @@ resource "aws_rds_cluster" "tfer--dsit-litellm-rds-pg-prod" {
   serverlessv2_scaling_configuration {
     max_capacity             = "8"
     min_capacity             = "0.5"
-    seconds_until_auto_pause = "0"
   }
 
   storage_encrypted = "true"

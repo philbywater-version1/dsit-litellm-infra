@@ -13,7 +13,7 @@ resource "aws_db_instance" "tfer--dsit-litellm-rds-pg-prod-instance-1" {
   db_subnet_group_name                  = "${aws_db_subnet_group.tfer--dsit-litellm-rds-pg-subnetgrp.name}"
   dedicated_log_volume                  = "false"
   deletion_protection                   = "false"
-  enabled_cloudwatch_logs_exports       = ["iam-db-auth-error", "instance", "postgresql"]
+  enabled_cloudwatch_logs_exports       = ["iam-db-auth-error", "postgresql"]
   engine                                = "aurora-postgresql"
   engine_lifecycle_support              = "open-source-rds-extended-support-disabled"
   engine_version                        = "17.4"
@@ -71,7 +71,7 @@ resource "aws_db_instance" "tfer--dsit-litellm-rds-pg-prod-instance-1-eu-west-2b
   db_subnet_group_name                  = "${aws_db_subnet_group.tfer--dsit-litellm-rds-pg-subnetgrp.name}"
   dedicated_log_volume                  = "false"
   deletion_protection                   = "false"
-  enabled_cloudwatch_logs_exports       = ["iam-db-auth-error", "instance", "postgresql"]
+  enabled_cloudwatch_logs_exports       = ["iam-db-auth-error", "postgresql"]
   engine                                = "aurora-postgresql"
   engine_lifecycle_support              = "open-source-rds-extended-support-disabled"
   engine_version                        = "17.4"
