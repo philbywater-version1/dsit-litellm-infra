@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:mso="urn:schemas-microsoft-com:office:office" xmlns:msdt="uuid:C2F41010-65B3-11d1-A29F-00AA00C14882">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LLMLite AWS Architecture</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #f8f9fa; font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; }
+  svg { display: block; margin: 0 auto; }
+  .label { font-size: 11px; font-weight: 600; text-anchor: middle; }
+  .sublabel { font-size: 9px; text-anchor: middle; fill: #555; }
+  .grouplabel { font-size: 11px; font-weight: 700; }
+  .iplabel { font-size: 8.5px; text-anchor: middle; fill: #444; font-style: italic; }
+  .title { font-size: 16px; font-weight: 800; text-anchor: middle; fill: #1a1a2e; }
+  .subtitle { font-size: 11px; text-anchor: middle; fill: #555; }
+</style>
+
+<!--[if gte mso 9]><xml>
+<mso:CustomDocumentProperties>
+<mso:m817f42addf14c9a838da36e78800043 msdt:dt="string">GDS|444fcede-209e-4852-86df-859b7c4e54f8</mso:m817f42addf14c9a838da36e78800043>
+<mso:c6f593ada1854b629148449de059396b msdt:dt="string">DSIT|9b2b16d8-8f0e-f9f9-8d2e-30d6eeb93788</mso:c6f593ada1854b629148449de059396b>
+<mso:h573c97cf80c4aa6b446c5363dc3ac94 msdt:dt="string">Office of the Government Chief Technology Officer|a8a6eb5b-5099-4892-bacb-4a22427543b8</mso:h573c97cf80c4aa6b446c5363dc3ac94>
+<mso:TaxCatchAll msdt:dt="string">3;#DSIT;#2;#Office of the Government Chief Technology Officer;#1;#GDS</mso:TaxCatchAll>
+<mso:_dlc_DocId msdt:dt="string">VT2TPC4ERZEH-237637144-340</mso:_dlc_DocId>
+<mso:_dlc_DocIdItemGuid msdt:dt="string">a0c97ae4-650f-4929-bed4-5bb976897cdc</mso:_dlc_DocIdItemGuid>
+<mso:_dlc_DocIdUrl msdt:dt="string">https://beisgov.sharepoint.com/sites/AIInSDLCProgramme-Deliveryteam-restricted/_layouts/15/DocIdRedir.aspx?ID=VT2TPC4ERZEH-237637144-340, VT2TPC4ERZEH-237637144-340</mso:_dlc_DocIdUrl>
+</mso:CustomDocumentProperties>
+</xml><![endif]-->
+</head>
+<body>
+<svg width="1100" height="900" viewBox="0 0 1100 900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Arrow marker -->
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#555"/>
+    </marker>
+    <marker id="arrowblue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#1a73e8"/>
+    </marker>
+    <marker id="arroworange" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#e87c1a"/>
+    </marker>
+    <!-- Drop shadow -->
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="1" dy="2" stdDeviation="2" flood-opacity="0.15"/>
+    </filter>
+  </defs>
+
+  <!-- ═══════════════════════════════════ BACKGROUND ═══════════════════════════════════ -->
+  <rect width="1100" height="900" fill="#f0f2f5" rx="8"/>
+
+  <!-- Title -->
+  <text x="550" y="30" class="title">LLMLite Gateway — AWS Architecture</text>
+  <text x="550" y="48" class="subtitle">eu-west-2 (Europe - London) · Single AWS Account · VPC: 10.1.0.0/20</text>
+
+  <!-- ═══════════════════════════════════ AWS ACCOUNT BORDER ═══════════════════════════ -->
+  <rect x="20" y="60" width="1060" height="820" rx="10" fill="none" stroke="#e47911" stroke-width="2" stroke-dasharray="6,3"/>
+  <rect x="20" y="60" width="155" height="20" rx="3" fill="#e47911"/>
+  <text x="100" y="74" font-size="10" font-weight="700" fill="white" text-anchor="middle">AWS Account: eu-west-2</text>
+
+  <!-- ═══════════════════════════════════ VPC BORDER ═══════════════════════════════════ -->
+  <rect x="35" y="90" width="1030" height="780" rx="8" fill="none" stroke="#8c4fff" stroke-width="2" stroke-dasharray="5,3"/>
+  <rect x="35" y="90" width="190" height="18" rx="3" fill="#8c4fff"/>
+  <text x="130" y="103" font-size="10" font-weight="700" fill="white" text-anchor="middle">VPC: llmlite-vpc  10.1.0.0/20</text>
+
+  <!-- ═══════════════════════════════ INTERNET / USERS (top) ═══════════════════════════ -->
+  <!-- Users -->
+  <g transform="translate(95,115)">
+    <!-- Person icon -->
+    <circle cx="0" cy="12" r="9" fill="#4a90d9" opacity="0.9"/>
+    <circle cx="0" cy="5" r="5" fill="#4a90d9" opacity="0.9"/>
+    <text x="0" y="42" class="label" fill="#1a1a2e">Users / IDEs</text>
+    <text x="0" y="54" class="sublabel">Cursor · Python · API</text>
+  </g>
+
+  <!-- Admin -->
+  <g transform="translate(230,115)">
+    <circle cx="0" cy="12" r="9" fill="#e47911" opacity="0.9"/>
+    <circle cx="0" cy="5" r="5" fill="#e47911" opacity="0.9"/>
+    <text x="0" y="42" class="label" fill="#1a1a2e">Admin</text>
+    <text x="0" y="54" class="sublabel">Key Management</text>
+  </g>
+
+  <!-- Arrow from users down -->
+  <line x1="95" y1="160" x2="95" y2="200" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)" stroke-dasharray="4,2"/>
+  <line x1="230" y1="160" x2="230" y2="200" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)" stroke-dasharray="4,2"/>
+  <text x="155" y="182" font-size="8.5" text-anchor="middle" fill="#555">HTTPS :443</text>
+
+  <!-- ═══════════════════════════════════ WAF ════════════════════════════════════════ -->
+  <!-- WAF box -->
+  <rect x="50" y="195" width="310" height="70" rx="6" fill="#fff3e0" stroke="#e87c1a" stroke-width="2" filter="url(#shadow)"/>
+  <!-- WAF shield icon -->
+  <g transform="translate(70,210)">
+    <path d="M14,0 L28,5 L28,18 C28,24 14,30 14,30 C14,30 0,24 0,18 L0,5 Z" fill="#e87c1a" opacity="0.85"/>
+    <text x="14" y="18" font-size="10" font-weight="800" fill="white" text-anchor="middle">W</text>
+  </g>
+  <text x="215" y="223" font-size="12" font-weight="700" fill="#b35900" text-anchor="middle">AWS WAF v2</text>
+  <text x="215" y="237" font-size="9" fill="#555" text-anchor="middle">WebACL: llmlite-waf-acl</text>
+  <text x="215" y="250" font-size="8.5" fill="#777" text-anchor="middle">IP Reputation · OWASP · Rate Limit 2k/5min</text>
+
+  <!-- WAF to ALB arrow -->
+  <line x1="205" y1="265" x2="205" y2="295" stroke="#e87c1a" stroke-width="2" marker-end="url(#arroworange)"/>
+  <text x="235" y="283" font-size="8" fill="#e87c1a">Allowed</text>
+
+  <!-- ═══════════════════════════════ PUBLIC SUBNETS ════════════════════════════════ -->
+  <rect x="50" y="290" width="1005" height="120" rx="6" fill="#e8f5e9" stroke="#43a047" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="60" y="306" class="grouplabel" fill="#2e7d32" font-size="10">Public Subnets</text>
+  <text x="60" y="318" font-size="9" fill="#388e3c">AZ eu-west-2a: 10.1.1.0/24   |   AZ eu-west-2b: 10.1.2.0/24</text>
+
+  <!-- Internet Gateway -->
+  <g transform="translate(870,305)">
+    <rect x="-35" y="0" width="70" height="60" rx="5" fill="#fff" stroke="#43a047" stroke-width="1.5" filter="url(#shadow)"/>
+    <!-- IGW icon: globe-ish -->
+    <ellipse cx="0" cy="20" rx="18" ry="18" fill="none" stroke="#43a047" stroke-width="2"/>
+    <line x1="-18" y1="20" x2="18" y2="20" stroke="#43a047" stroke-width="1.5"/>
+    <ellipse cx="0" cy="20" rx="8" ry="18" fill="none" stroke="#43a047" stroke-width="1.5"/>
+    <text x="0" y="50" class="label" fill="#2e7d32">IGW</text>
+  </g>
+
+  <!-- ALB -->
+  <g transform="translate(205,310)">
+    <rect x="-90" y="0" width="180" height="80" rx="6" fill="#fff" stroke="#43a047" stroke-width="2" filter="url(#shadow)"/>
+    <!-- ALB icon (load balancer shape) -->
+    <rect x="-18" y="8" width="36" height="24" rx="3" fill="#43a047" opacity="0.8"/>
+    <line x1="-18" y1="20" x2="-30" y2="30" stroke="#43a047" stroke-width="2"/>
+    <line x1="0" y1="20" x2="0" y2="32" stroke="#43a047" stroke-width="2"/>
+    <line x1="18" y1="20" x2="30" y2="30" stroke="#43a047" stroke-width="2"/>
+    <text x="0" y="52" class="label" fill="#1a1a2e">ALB: llmlite-alb</text>
+    <text x="0" y="63" class="sublabel">HTTPS :443 · HTTP→HTTPS</text>
+    <text x="0" y="74" class="iplabel">10.1.1.10 · 10.1.2.10</text>
+  </g>
+
+  <!-- NAT Gateway AZ-2a -->
+  <g transform="translate(490,310)">
+    <rect x="-60" y="0" width="120" height="80" rx="6" fill="#fff" stroke="#43a047" stroke-width="1.5" filter="url(#shadow)"/>
+    <circle cx="0" cy="22" r="16" fill="#43a047" opacity="0.15" stroke="#43a047" stroke-width="1.5"/>
+    <text x="0" y="26" font-size="16" text-anchor="middle" fill="#43a047">⇄</text>
+    <text x="0" y="52" class="label" fill="#1a1a2e">NAT GW 2a</text>
+    <text x="0" y="63" class="sublabel">nat-gateway-2a</text>
+    <text x="0" y="74" class="iplabel">10.1.1.20</text>
+  </g>
+
+  <!-- NAT Gateway AZ-2b -->
+  <g transform="translate(650,310)">
+    <rect x="-60" y="0" width="120" height="80" rx="6" fill="#fff" stroke="#43a047" stroke-width="1.5" filter="url(#shadow)"/>
+    <circle cx="0" cy="22" r="16" fill="#43a047" opacity="0.15" stroke="#43a047" stroke-width="1.5"/>
+    <text x="0" y="26" font-size="16" text-anchor="middle" fill="#43a047">⇄</text>
+    <text x="0" y="52" class="label" fill="#1a1a2e">NAT GW 2b</text>
+    <text x="0" y="63" class="sublabel">nat-gateway-2b</text>
+    <text x="0" y="74" class="iplabel">10.1.2.20</text>
+  </g>
+
+  <!-- ALB to IGW -->
+  <line x1="835" y1="350" x2="870" y2="350" stroke="#43a047" stroke-width="1.5" marker-end="url(#arrow)" stroke-dasharray="4,2"/>
+
+  <!-- ═══════════════════════════════ PRIVATE SUBNETS ═══════════════════════════════ -->
+  <rect x="50" y="425" width="1005" height="165" rx="6" fill="#e3f2fd" stroke="#1a73e8" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="60" y="441" class="grouplabel" fill="#1565c0" font-size="10">Private Subnets (Fargate)</text>
+  <text x="60" y="453" font-size="9" fill="#1976d2">AZ eu-west-2a: 10.1.11.0/24   |   AZ eu-west-2b: 10.1.12.0/24</text>
+
+  <!-- ALB to Fargate arrow -->
+  <line x1="205" y1="390" x2="205" y2="460" stroke="#1a73e8" stroke-width="2" marker-end="url(#arrowblue)"/>
+  <text x="235" y="428" font-size="8" fill="#1a73e8">HTTP :4000</text>
+
+  <!-- ECS Cluster box -->
+  <rect x="65" y="460" width="680" height="120" rx="6" fill="#bbdefb" stroke="#1a73e8" stroke-width="1.5" stroke-dasharray="4,2"/>
+  <text x="75" y="476" font-size="9" font-weight="700" fill="#0d47a1">ECS Cluster: llmlite-cluster · Service: llmlite-service · Auto-scale 2–5 tasks</text>
+
+  <!-- Fargate Task 1 (AZ-2a) -->
+  <g transform="translate(115,483)">
+    <rect x="-55" y="0" width="110" height="82" rx="5" fill="#fff" stroke="#1a73e8" stroke-width="2" filter="url(#shadow)"/>
+    <!-- ECS/Fargate icon -->
+    <rect x="-18" y="6" width="36" height="26" rx="3" fill="#1a73e8" opacity="0.8"/>
+    <text x="0" y="23" font-size="9" font-weight="700" fill="white" text-anchor="middle">ECS</text>
+    <text x="0" y="50" class="label" fill="#1a1a2e">Fargate Task 1</text>
+    <text x="0" y="62" class="sublabel">LiteLLM Proxy</text>
+    <text x="0" y="73" class="sublabel">1vCPU · 2GB · :4000</text>
+    <text x="0" y="83" class="iplabel">10.1.11.10</text>
+  </g>
+
+  <!-- Fargate Task 2 (AZ-2b) -->
+  <g transform="translate(265,483)">
+    <rect x="-55" y="0" width="110" height="82" rx="5" fill="#fff" stroke="#1a73e8" stroke-width="2" filter="url(#shadow)"/>
+    <rect x="-18" y="6" width="36" height="26" rx="3" fill="#1a73e8" opacity="0.8"/>
+    <text x="0" y="23" font-size="9" font-weight="700" fill="white" text-anchor="middle">ECS</text>
+    <text x="0" y="50" class="label" fill="#1a1a2e">Fargate Task 2</text>
+    <text x="0" y="62" class="sublabel">LiteLLM Proxy</text>
+    <text x="0" y="73" class="sublabel">1vCPU · 2GB · :4000</text>
+    <text x="0" y="83" class="iplabel">10.1.12.10</text>
+  </g>
+
+  <!-- Fargate Task N -->
+  <g transform="translate(415,483)">
+    <rect x="-50" y="0" width="100" height="82" rx="5" fill="#e3f2fd" stroke="#1a73e8" stroke-width="1.5" stroke-dasharray="4,2"/>
+    <text x="0" y="38" font-size="22" text-anchor="middle" fill="#1a73e8">…</text>
+    <text x="0" y="60" class="label" fill="#555">Tasks 3–5</text>
+    <text x="0" y="72" class="sublabel">Auto-scaled</text>
+    <text x="0" y="83" class="iplabel">10.1.11.30 / 10.1.12.30</text>
+  </g>
+
+  <!-- Fargate to NAT (outbound to Bedrock) -->
+  <line x1="490" y1="505" x2="490" y2="420" stroke="#e87c1a" stroke-width="1.5" marker-end="url(#arroworange)" stroke-dasharray="4,2"/>
+  <line x1="490" y1="390" x2="490" y2="365" stroke="#e87c1a" stroke-width="1.5" marker-end="url(#arroworange)" stroke-dasharray="4,2"/>
+
+  <!-- Secrets Manager -->
+  <g transform="translate(595,483)">
+    <rect x="-55" y="0" width="110" height="82" rx="5" fill="#fff" stroke="#1a73e8" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="-14" y="6" width="28" height="28" rx="14" fill="#c0392b" opacity="0.8"/>
+    <text x="0" y="24" font-size="14" text-anchor="middle" fill="white">🔑</text>
+    <text x="0" y="52" class="label" fill="#1a1a2e">Secrets Manager</text>
+    <text x="0" y="63" class="sublabel">RDS Credentials</text>
+    <text x="0" y="74" class="sublabel">Master Key</text>
+    <text x="0" y="83" class="iplabel">Auto-rotation enabled</text>
+  </g>
+
+  <!-- KMS -->
+  <g transform="translate(725,483)">
+    <rect x="-55" y="0" width="110" height="82" rx="5" fill="#fff" stroke="#1a73e8" stroke-width="1.5" filter="url(#shadow)"/>
+    <polygon points="0,6 18,16 18,36 0,46 -18,36 -18,16" fill="#7b2d8b" opacity="0.8"/>
+    <text x="0" y="30" font-size="9" font-weight="700" fill="white" text-anchor="middle">KMS</text>
+    <text x="0" y="62" class="label" fill="#1a1a2e">KMS</text>
+    <text x="0" y="73" class="sublabel">llmlite-key</text>
+    <text x="0" y="83" class="iplabel">Annual auto-rotation</text>
+  </g>
+
+  <!-- ═══════════════════════════════ DATABASE SUBNETS ══════════════════════════════ -->
+  <rect x="50" y="605" width="700" height="135" rx="6" fill="#fce4ec" stroke="#c62828" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="60" y="621" class="grouplabel" fill="#b71c1c" font-size="10">Database Subnets (Isolated — No Internet Route)</text>
+  <text x="60" y="633" font-size="9" fill="#c62828">AZ eu-west-2a: 10.1.21.0/24   |   AZ eu-west-2b: 10.1.22.0/24</text>
+
+  <!-- RDS Primary -->
+  <g transform="translate(160,645)">
+    <rect x="-90" y="0" width="180" height="82" rx="5" fill="#fff" stroke="#c62828" stroke-width="2" filter="url(#shadow)"/>
+    <!-- RDS cylinder icon -->
+    <ellipse cx="0" cy="12" rx="22" ry="8" fill="#c62828" opacity="0.8"/>
+    <rect x="-22" y="12" width="44" height="22" fill="#c62828" opacity="0.5"/>
+    <ellipse cx="0" cy="34" rx="22" ry="8" fill="#c62828" opacity="0.7"/>
+    <text x="0" y="56" class="label" fill="#1a1a2e">RDS PostgreSQL</text>
+    <text x="0" y="67" class="sublabel">Primary · db.t4g.small · 20GB GP3</text>
+    <text x="0" y="77" class="sublabel">Multi-AZ · Port 5432</text>
+    <text x="0" y="87" class="iplabel">10.1.21.10 (eu-west-2a)</text>
+  </g>
+
+  <!-- RDS Standby -->
+  <g transform="translate(420,645)">
+    <rect x="-90" y="0" width="180" height="82" rx="5" fill="#fff" stroke="#c62828" stroke-width="1.5" stroke-dasharray="5,3" filter="url(#shadow)"/>
+    <ellipse cx="0" cy="12" rx="22" ry="8" fill="#c62828" opacity="0.4"/>
+    <rect x="-22" y="12" width="44" height="22" fill="#c62828" opacity="0.25"/>
+    <ellipse cx="0" cy="34" rx="22" ry="8" fill="#c62828" opacity="0.35"/>
+    <text x="0" y="56" class="label" fill="#1a1a2e">RDS Standby</text>
+    <text x="0" y="67" class="sublabel">Replica · Auto-failover</text>
+    <text x="0" y="77" class="sublabel">Sync replication (WAL)</text>
+    <text x="0" y="87" class="iplabel">10.1.22.10 (eu-west-2b)</text>
+  </g>
+
+  <!-- Replication arrow between RDS -->
+  <line x1="250" y1="686" x2="330" y2="686" stroke="#c62828" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="290" y="679" font-size="8" text-anchor="middle" fill="#c62828">Sync</text>
+
+  <!-- Fargate to RDS arrow -->
+  <line x1="190" y1="565" x2="190" y2="640" stroke="#c62828" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="225" y="607" font-size="8" fill="#c62828">TCP :5432</text>
+  <text x="225" y="617" font-size="8" fill="#c62828">SSL/TLS</text>
+
+  <!-- ═══════════════════════════════ AWS MANAGED SERVICES (right column) ══════════ -->
+
+  <!-- Bedrock -->
+  <g transform="translate(870,440)">
+    <rect x="-85" y="0" width="170" height="105" rx="6" fill="#fff" stroke="#7b2d8b" stroke-width="2" filter="url(#shadow)"/>
+    <!-- Bedrock icon (hexagon) -->
+    <polygon points="0,8 22,20 22,44 0,56 -22,44 -22,20" fill="#7b2d8b" opacity="0.8"/>
+    <text x="0" y="38" font-size="9" font-weight="700" fill="white" text-anchor="middle">Bedrock</text>
+    <text x="0" y="76" class="label" fill="#1a1a2e">Amazon Bedrock</text>
+    <text x="0" y="88" class="sublabel">Claude 3.5 Sonnet</text>
+    <text x="0" y="99" class="sublabel">Claude 3 Opus</text>
+  </g>
+
+  <!-- Bedrock label / region -->
+  <text x="870" y="558" font-size="8" text-anchor="middle" fill="#7b2d8b" font-style="italic">eu-west-2</text>
+
+  <!-- IGW to Bedrock arrow -->
+  <line x1="905" y1="395" x2="905" y2="437" stroke="#7b2d8b" stroke-width="1.5" marker-end="url(#arrow)" stroke-dasharray="4,2"/>
+  <text x="935" y="420" font-size="8" fill="#7b2d8b">HTTPS</text>
+
+  <!-- S3 -->
+  <g transform="translate(870,580)">
+    <rect x="-85" y="0" width="170" height="100" rx="6" fill="#fff" stroke="#e87c1a" stroke-width="1.5" filter="url(#shadow)"/>
+    <!-- S3 bucket icon -->
+    <ellipse cx="0" cy="14" rx="24" ry="10" fill="#e87c1a" opacity="0.8"/>
+    <rect x="-24" y="14" width="48" height="26" fill="#e87c1a" opacity="0.5"/>
+    <ellipse cx="0" cy="40" rx="24" ry="10" fill="#e87c1a" opacity="0.7"/>
+    <text x="0" y="65" class="label" fill="#1a1a2e">Amazon S3</text>
+    <text x="0" y="76" class="sublabel">llmlite-audit-logs</text>
+    <text x="0" y="87" class="sublabel">llmlite-waf-logs</text>
+    <text x="0" y="97" class="sublabel">KMS encrypted · Glacier 90d</text>
+  </g>
+
+  <!-- CloudWatch -->
+  <g transform="translate(870,700)">
+    <rect x="-85" y="0" width="170" height="100" rx="6" fill="#fff" stroke="#e87c1a" stroke-width="1.5" filter="url(#shadow)"/>
+    <!-- CW icon (simple wave) -->
+    <path d="M-24,22 Q-12,8 0,22 Q12,36 24,22" fill="none" stroke="#e87c1a" stroke-width="3"/>
+    <path d="M-24,34 Q-12,20 0,34 Q12,48 24,34" fill="none" stroke="#e87c1a" stroke-width="2" opacity="0.5"/>
+    <text x="0" y="62" class="label" fill="#1a1a2e">CloudWatch</text>
+    <text x="0" y="73" class="sublabel">Logs · Metrics · Alarms</text>
+    <text x="0" y="84" class="sublabel">/ecs/llmlite-proxy</text>
+    <text x="0" y="95" class="sublabel">aws-waf-logs-llmlite</text>
+  </g>
+
+  <!-- Fargate to CW/S3 (logging) -->
+  <line x1="540" y1="520" x2="785" y2="614" stroke="#e87c1a" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#arroworange)"/>
+  <text x="660" y="562" font-size="8" fill="#e87c1a" transform="rotate(-20,660,562)">Logs / Audit</text>
+
+  <!-- WAF to CW/S3 (WAF logging) -->
+  <line x1="360" y1="240" x2="785" y2="595" stroke="#e87c1a" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arroworange)" opacity="0.7"/>
+
+  <!-- RDS to CW -->
+  <line x1="625" y1="700" x2="785" y2="730" stroke="#e87c1a" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#arroworange)"/>
+
+  <!-- ═══════════════════════════════════ SECURITY GROUPS LEGEND ════════════════════ -->
+  <rect x="55" y="755" width="690" height="58" rx="5" fill="#fff9f0" stroke="#e87c1a" stroke-width="1" opacity="0.9"/>
+  <text x="65" y="770" font-size="9" font-weight="700" fill="#b35900">Security Groups</text>
+  <rect x="65" y="776" width="10" height="10" fill="#43a047" rx="2"/>
+  <text x="80" y="784" font-size="8.5" fill="#333">alb-sg: In TCP 80,443 from 0.0.0.0/0 · Out TCP 4000 → fargate-sg</text>
+  <rect x="65" y="791" width="10" height="10" fill="#1a73e8" rx="2"/>
+  <text x="80" y="799" font-size="8.5" fill="#333">fargate-sg: In TCP 4000 from alb-sg · Out TCP 443 to 0.0.0.0/0 · Out TCP 5432 → rds-sg</text>
+  <rect x="65" y="806" width="10" height="10" fill="#c62828" rx="2"/>
+  <text x="80" y="813" font-size="8.5" fill="#333">rds-sg: In TCP 5432 from fargate-sg only · No outbound</text>
+
+  <!-- ═══════════════════════════════════ FLOW LEGEND ════════════════════════════════ -->
+  <rect x="55" y="818" width="690" height="35" rx="5" fill="#f5f5f5" stroke="#ccc" stroke-width="1"/>
+  <text x="65" y="832" font-size="9" font-weight="700" fill="#333">Request Flow</text>
+  <line x1="140" y1="828" x2="170" y2="828" stroke="#555" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="180" y="832" font-size="8.5" fill="#333">Inbound (User → Bedrock)</text>
+  <line x1="310" y1="828" x2="340" y2="828" stroke="#e87c1a" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#arroworange)"/>
+  <text x="350" y="832" font-size="8.5" fill="#333">Logging / Monitoring</text>
+  <line x1="470" y1="828" x2="500" y2="828" stroke="#c62828" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow)"/>
+  <text x="510" y="832" font-size="8.5" fill="#333">DB Sync (Multi-AZ)</text>
+  <line x1="140" y1="843" x2="170" y2="843" stroke="#c62828" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="180" y="847" font-size="8.5" fill="#333">DB Queries (TCP 5432)</text>
+  <line x1="310" y1="843" x2="340" y2="843" stroke="#7b2d8b" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#arrow)"/>
+  <text x="350" y="847" font-size="8.5" fill="#333">LLM Inference (HTTPS)</text>
+
+</svg>
+</body>
+</html>
