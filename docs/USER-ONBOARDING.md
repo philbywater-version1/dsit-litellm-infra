@@ -1,8 +1,27 @@
-# LiteLLM User Onboarding Guide 
+# LiteLLM User Onboarding Guide
 
 ## Overview
 
-This guide walks through the process of onboarding a new user to the LiteLLM AI Gateway. The process consists of three steps:
+This guide walks through the process of onboarding a new user to the LiteLLM AI Gateway and configuring their developer tools to use it.
+
+---
+
+## Contents
+
+1. [Prerequisites](#prerequisites)
+2. [Step 1: Create the User](#step-1-create-the-user)
+3. [Step 2: Generate an Invitation Link](#step-2-generate-an-invitation-link)
+4. [Step 3: Send the Onboarding Link](#step-3-send-the-onboarding-link-to-the-user)
+5. [What the User Gets Access To](#what-the-user-gets-access-to)
+6. [Automating User Onboarding with Python](#automating-user-onboarding-with-python)
+7. [Configuring the Continue.dev VS Code Extension](#configuring-the-continuedev-vs-code-extension)
+8. [Configuring GitHub Copilot in VS Code](#configuring-github-copilot-in-vs-code)
+9. [Configuring Claude Code](#configuring-claude-code)
+10. [Troubleshooting](#troubleshooting)
+
+---
+
+The onboarding process consists of three steps:
 
 1. Create the user account via the API
 2. Generate an invitation link via the API
@@ -49,7 +68,7 @@ curl -X POST '<PROXY_URL>/user/new' \
 **Example:**
 ```bash
 curl -X POST 'https://licenseportal.aiengineeringlab.co.uk/user/new' \
-  -H 'Authorization: Bearer sk-1234' \
+  -H 'Authorization: Bearer sk-xxxxxxxxxxxxxxxxxxxx' \
   -H 'Content-Type: application/json' \
   -d '{
     "user_email": "alice@company.com",
@@ -92,7 +111,7 @@ curl -X POST '<PROXY_URL>/invitation/new' \
 **Example:**
 ```bash
 curl -X POST 'https://licenseportal.aiengineeringlab.co.uk/invitation/new' \
-  -H 'Authorization: Bearer sk-1234' \
+  -H 'Authorization: Bearer sk-xxxxxxxxxxxxxxxxxxxx' \
   -H 'Content-Type: application/json' \
   -d '{ "user_id": "e050dc40-9f3c-4982-b736-a0d019fbd82f" }'
 ```
@@ -148,8 +167,6 @@ Once onboarded, the user will have access to everything configured on their assi
 
 ---
 
----
-
 ## Automating User Onboarding with Python
 
 The following script automates the three-step onboarding process for one or more users. It reads from a CSV file, creates each user, generates an invitation link, and outputs the onboarding URLs ready to send.
@@ -178,7 +195,7 @@ import requests
 # Configuration — update these values before running
 # -----------------------------------------------
 PROXY_URL   = "https://licenseportal.aiengineeringlab.co.uk"
-MASTER_KEY  = "sk-1234"
+MASTER_KEY  = "sk-xxxxxxxxxxxxxxxxxxxx"
 CSV_FILE    = "users.csv"
 USER_ROLE   = "internal_user"
 # -----------------------------------------------
@@ -311,8 +328,6 @@ python onboard_users.py
 
 ---
 
----
-
 ## Configuring the Continue.dev VS Code Extension
 
 [Continue](https://www.continue.dev/) is a VS Code extension that provides AI-assisted coding (chat, autocomplete, and code editing) directly within your IDE. Once you have your LLMLite virtual API key, you can configure Continue to use the LLMLite gateway as its model provider.
@@ -382,13 +397,13 @@ models:
     provider: anthropic
     model: eu.anthropic.claude-sonnet-4-5-20250929-v1:0
     apiBase: https://licenseportal.aiengineeringlab.co.uk/v1
-    apiKey: sk-LWHQPS2seYyIdXABCHykdg
+    apiKey: sk-xxxxxxxxxxxxxxxxxxxx
 
   - name: LiteLLM - Claude Haiku 4.5
     provider: anthropic
     model: eu.anthropic.claude-haiku-4-5-20251001-v1:0
     apiBase: https://licenseportal.aiengineeringlab.co.uk/v1
-    apiKey: sk-LWHQPS2seYyIdXABCHykdg
+    apiKey: sk-xxxxxxxxxxxxxxxxxxxx
 ```
 
 ### Available Models
@@ -426,10 +441,314 @@ tabAutocompleteModel:
   provider: anthropic
   model: eu.anthropic.claude-haiku-4-5-20251001-v1:0
   apiBase: https://licenseportal.aiengineeringlab.co.uk/v1
-  apiKey: sk-LWHQPS2seYyIdXABCHykdg
+  apiKey: sk-xxxxxxxxxxxxxxxxxxxx
 ```
 
 > **Note:** Claude Haiku 4.5 is recommended for autocomplete due to its faster response time.
+
+---
+
+## Configuring GitHub Copilot in VS Code
+
+GitHub Copilot is Microsoft's AI coding assistant built into VS Code. It can be configured to use the LLMLite gateway as its model provider via the **Bring Your Own Key (BYOK)** feature, available from VS Code **v1.99** onwards.
+
+> **⚠️ Important — Provider Selection:** GitHub Copilot's native **Anthropic BYOK** provider does not currently support a custom base URL, which means it cannot be pointed at the LLMLite gateway directly. Instead, you must add LLMLite as an **OpenAI Compatible** provider, which does support a custom endpoint. The models will function identically — only the provider type differs.
+
+> **Note:** BYOK in GitHub Copilot is available to users on **individual Copilot plans (Free, Pro, Pro+)** only. It is not currently available to **Copilot Business or Enterprise** users — those users should use the Continue.dev extension instead.
+
+---
+
+### Prerequisites
+
+- VS Code **v1.99** or later
+- GitHub Copilot extension installed and signed in
+- Your LLMLite **virtual API key** (begins with `sk-`)
+
+---
+
+### Step 1: Open the Language Models Manager
+
+1. Open the **Copilot Chat** panel (`Ctrl+Alt+I` / `Ctrl+Cmd+I` on Mac)
+2. Click the **model picker** dropdown at the top of the chat input
+3. Select **Manage Models...**
+
+Alternatively, open the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) and run:
+
+```
+Chat: Manage Language Models
+```
+
+---
+
+### Step 2: Add an OpenAI Compatible Provider
+
+1. In the Language Models editor, click **Add Models**
+2. From the provider list, select **OpenAI Compatible**
+3. Enter the following details:
+
+**Template:**
+
+| Field | Value |
+|---|---|
+| **Endpoint URL** | `<PROXY_URL>/v1` |
+| **API Key** | `<YOUR_VIRTUAL_KEY>` |
+| **Model ID** | `<MODEL_ID>` |
+| **Model Display Name** | `<MODEL_DISPLAY_NAME>` |
+
+**Example (LLMLite AI Engineering Lab gateway):**
+
+| Field | Value |
+|---|---|
+| **Endpoint URL** | `https://licenseportal.aiengineeringlab.co.uk/v1` |
+| **API Key** | `sk-xxxxxxxxxxxxxxxxxxxx` |
+| **Model ID** | `eu.anthropic.claude-sonnet-4-5-20250929-v1:0` |
+| **Model Display Name** | `LiteLLM - Claude Sonnet 4.5` |
+
+4. Click **Add** to save the model
+5. Repeat for any additional models (e.g. Claude Haiku 4.5)
+
+---
+
+### Step 3: Select the Model in Chat
+
+1. Open the **Copilot Chat** panel
+2. Click the **model picker** dropdown
+3. Your new model(s) will appear in the list — select **LiteLLM - Claude Sonnet 4.5** (or whichever you added)
+4. Send a test message to confirm the connection is working
+
+---
+
+### Available Models
+
+| Display Name | Model ID | Best For |
+|---|---|---|
+| LiteLLM - Claude Sonnet 4.5 | `eu.anthropic.claude-sonnet-4-5-20250929-v1:0` | General chat, code review, complex tasks |
+| LiteLLM - Claude Haiku 4.5 | `eu.anthropic.claude-haiku-4-5-20251001-v1:0` | Fast responses, simple tasks |
+
+---
+
+### Alternative: Configure via VS Code settings.json
+
+If you prefer to configure via settings rather than the UI, you can add the following to your VS Code `settings.json` (`Ctrl+Shift+P` → **Preferences: Open User Settings (JSON)**):
+
+**Template:**
+```json
+{
+  "github.copilot.chat.customOAIModels": [
+    {
+      "name": "<MODEL_DISPLAY_NAME>",
+      "url": "<PROXY_URL>/v1",
+      "apiKey": "<YOUR_VIRTUAL_KEY>",
+      "modelId": "<MODEL_ID>"
+    }
+  ]
+}
+```
+
+**Example:**
+```json
+{
+  "github.copilot.chat.customOAIModels": [
+    {
+      "name": "LiteLLM - Claude Sonnet 4.5",
+      "url": "https://licenseportal.aiengineeringlab.co.uk/v1",
+      "apiKey": "sk-xxxxxxxxxxxxxxxxxxxx",
+      "modelId": "eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
+    },
+    {
+      "name": "LiteLLM - Claude Haiku 4.5",
+      "url": "https://licenseportal.aiengineeringlab.co.uk/v1",
+      "apiKey": "sk-xxxxxxxxxxxxxxxxxxxx",
+      "modelId": "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
+    }
+  ]
+}
+```
+
+Save the file — VS Code will reload the configuration automatically.
+
+---
+
+### Troubleshooting
+
+| Issue | Resolution |
+|---|---|
+| **OpenAI Compatible** option not visible | Ensure VS Code is updated to v1.99 or later. Run **Help: Check for Updates**. |
+| Model not appearing in picker after adding | Close and reopen the chat panel, or reload VS Code (`Ctrl+Shift+P` → **Developer: Reload Window**) |
+| `401 Unauthorized` error | Verify your virtual key is correct and has not expired. Generate a new key via the LLMLite Admin Portal if needed. |
+| `404 Not Found` error | Check the endpoint URL ends with `/v1` and does not have a trailing slash after it |
+| Feature unavailable (Copilot Business/Enterprise) | BYOK is not supported on Business/Enterprise plans. Use the **Continue.dev** extension instead — see the section above. |
+
+---
+
+## Configuring Claude Code
+
+Claude Code is Anthropic's official agentic coding assistant. It is available as both a **VS Code extension** and a **CLI tool**, and can be configured to route all requests through the LLMLite gateway using two environment variables.
+
+> **Note:** The VS Code extension and the CLI share the same settings file (`~/.claude/settings.json`), so configuring one configures both.
+
+---
+
+### Prerequisites
+
+- Claude Code VS Code extension installed, **or** Claude Code CLI installed (`npm install -g @anthropic-ai/claude-code`)
+- Your LLMLite **virtual API key** (begins with `sk-`)
+
+---
+
+### Option A: Configure via `~/.claude/settings.json` (Recommended)
+
+This method persists across all terminal sessions and is shared between the CLI and the VS Code extension.
+
+**File location:**
+
+| Operating System | File Path |
+|---|---|
+| **Windows** | `%USERPROFILE%\.claude\settings.json` |
+| **macOS / Linux** | `~/.claude/settings.json` |
+
+Create or edit the file and add the following `env` block:
+
+**Template:**
+```json
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "<PROXY_URL>",
+    "ANTHROPIC_AUTH_TOKEN": "<YOUR_VIRTUAL_KEY>",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "<SONNET_MODEL_ID>",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "<HAIKU_MODEL_ID>"
+  }
+}
+```
+
+| Parameter | Description |
+|---|---|
+| `PROXY_URL` | The LLMLite gateway base URL (without `/v1`) |
+| `YOUR_VIRTUAL_KEY` | Your personal LLMLite virtual API key (begins with `sk-`) |
+| `SONNET_MODEL_ID` | The model ID to use for Sonnet-class requests |
+| `HAIKU_MODEL_ID` | The model ID to use for Haiku-class (fast/background) requests |
+
+**Example:**
+```json
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://licenseportal.aiengineeringlab.co.uk",
+    "ANTHROPIC_AUTH_TOKEN": "sk-xxxxxxxxxxxxxxxxxxxx",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "eu.anthropic.claude-sonnet-4-5-20250929-v1:0",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
+  }
+}
+```
+
+> **Note:** `ANTHROPIC_BASE_URL` should be the base gateway URL **without** a `/v1` suffix. Claude Code appends the correct path automatically.
+
+---
+
+### Option B: Configure via Environment Variables (CLI / Terminal Session)
+
+For a quick per-session configuration, export the variables directly in your terminal before launching Claude Code.
+
+**macOS / Linux:**
+
+**Template:**
+```bash
+export ANTHROPIC_BASE_URL="<PROXY_URL>"
+export ANTHROPIC_AUTH_TOKEN="<YOUR_VIRTUAL_KEY>"
+export ANTHROPIC_DEFAULT_SONNET_MODEL="<SONNET_MODEL_ID>"
+export ANTHROPIC_DEFAULT_HAIKU_MODEL="<HAIKU_MODEL_ID>"
+claude
+```
+
+**Example:**
+```bash
+export ANTHROPIC_BASE_URL="https://licenseportal.aiengineeringlab.co.uk"
+export ANTHROPIC_AUTH_TOKEN="sk-xxxxxxxxxxxxxxxxxxxx"
+export ANTHROPIC_DEFAULT_SONNET_MODEL="eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
+export ANTHROPIC_DEFAULT_HAIKU_MODEL="eu.anthropic.claude-haiku-4-5-20251001-v1:0"
+claude
+```
+
+**Windows (PowerShell):**
+
+```powershell
+$env:ANTHROPIC_BASE_URL = "https://licenseportal.aiengineeringlab.co.uk"
+$env:ANTHROPIC_AUTH_TOKEN = "sk-xxxxxxxxxxxxxxxxxxxx"
+$env:ANTHROPIC_DEFAULT_SONNET_MODEL = "eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
+$env:ANTHROPIC_DEFAULT_HAIKU_MODEL = "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
+claude
+```
+
+> **Tip:** To make these permanent on macOS/Linux, add the `export` lines to your `~/.bashrc` or `~/.zshrc` file. On Windows, use `setx` or add to your PowerShell `$PROFILE`.
+
+---
+
+### Option C: Configure the VS Code Extension
+
+If you prefer to configure the Claude Code VS Code extension directly via VS Code settings:
+
+1. Open VS Code Settings (`Ctrl+,` / `Cmd+,`)
+2. Search for **Claude Code: Environment Variables**
+3. Click **Edit in settings.json**
+4. Add the following to your VS Code `settings.json`:
+
+**Template:**
+```json
+{
+  "claudeCode.environmentVariables": [
+    { "name": "ANTHROPIC_BASE_URL",              "value": "<PROXY_URL>" },
+    { "name": "ANTHROPIC_AUTH_TOKEN",             "value": "<YOUR_VIRTUAL_KEY>" },
+    { "name": "ANTHROPIC_DEFAULT_SONNET_MODEL",   "value": "<SONNET_MODEL_ID>" },
+    { "name": "ANTHROPIC_DEFAULT_HAIKU_MODEL",    "value": "<HAIKU_MODEL_ID>" }
+  ]
+}
+```
+
+**Example:**
+```json
+{
+  "claudeCode.environmentVariables": [
+    { "name": "ANTHROPIC_BASE_URL",              "value": "https://licenseportal.aiengineeringlab.co.uk" },
+    { "name": "ANTHROPIC_AUTH_TOKEN",             "value": "sk-xxxxxxxxxxxxxxxxxxxx" },
+    { "name": "ANTHROPIC_DEFAULT_SONNET_MODEL",   "value": "eu.anthropic.claude-sonnet-4-5-20250929-v1:0" },
+    { "name": "ANTHROPIC_DEFAULT_HAIKU_MODEL",    "value": "eu.anthropic.claude-haiku-4-5-20251001-v1:0" }
+  ]
+}
+```
+
+Restart VS Code after saving to ensure the settings take effect.
+
+---
+
+### Available Models
+
+| Display Name | Model ID | Used For |
+|---|---|---|
+| Claude Sonnet 4.5 | `eu.anthropic.claude-sonnet-4-5-20250929-v1:0` | Main chat and complex tasks |
+| Claude Haiku 4.5 | `eu.anthropic.claude-haiku-4-5-20251001-v1:0` | Fast background tasks |
+
+---
+
+### Verify the Configuration
+
+Once configured, launch Claude Code and run a quick test:
+
+```bash
+claude "Hello — which model are you?"
+```
+
+Claude Code should respond without prompting for a login and the response should confirm it is routing through the LLMLite gateway.
+
+---
+
+### Troubleshooting
+
+| Issue | Resolution |
+|---|---|
+| Login/sign-in prompt appears on first run | On a fresh install, Claude Code may ignore `settings.json` on the very first launch. Workaround: temporarily set `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` as shell environment variables, run `claude` once to complete initialisation, then remove them — `settings.json` will be picked up on subsequent runs. |
+| `401 Unauthorized` | Verify your virtual key is correct and has not expired. Generate a new key via the LLMLite Admin Portal if needed. |
+| `Connection refused` or `Unable to connect` | Check that `ANTHROPIC_BASE_URL` does **not** include `/v1` at the end. |
+| Extension not picking up `settings.json` changes | Fully restart VS Code (`Ctrl+Shift+P` → **Developer: Reload Window**) after editing the settings file. |
+| VS Code extension shows Anthropic login screen | Ensure `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` are set in the VS Code extension settings (Option C above), not just in `settings.json`, as the extension and CLI may load configuration differently. |
 
 ---
 
