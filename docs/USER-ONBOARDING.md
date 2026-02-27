@@ -1,4 +1,4 @@
-# LiteLLM User Onboarding Guide
+# LiteLLM User Onboarding Guide 
 
 ## Overview
 
@@ -308,6 +308,128 @@ Run the script:
 ```bash
 python onboard_users.py
 ```
+
+---
+
+---
+
+## Configuring the Continue.dev VS Code Extension
+
+[Continue](https://www.continue.dev/) is a VS Code extension that provides AI-assisted coding (chat, autocomplete, and code editing) directly within your IDE. Once you have your LLMLite virtual API key, you can configure Continue to use the LLMLite gateway as its model provider.
+
+### Step 1: Install the Continue Extension
+
+1. Open VS Code
+2. Open the **Extensions Marketplace** (`Ctrl+Shift+X` / `Cmd+Shift+X`)
+3. Search for **Continue** and install the extension published by `Continue`
+4. Once installed, the Continue panel will appear in the left sidebar
+
+### Step 2: Locate the Config File
+
+The Continue configuration file is stored in your home directory. The filename is always `config.yaml`.
+
+| Operating System | File Location |
+|---|---|
+| **Windows** | `%USERPROFILE%\.continue\config.yaml` (e.g. `C:\Users\alice\.continue\config.yaml`) |
+| **macOS / Linux** | `~/.continue/config.yaml` (e.g. `/Users/alice/.continue/config.yaml`) |
+
+> **Tip:** You can open the file directly from within VS Code. In the Continue chat panel, click the **config selector dropdown** in the top-right corner, then click the **cog icon** next to "Local Config". Continue will open `config.yaml` in the editor automatically.
+
+> **Note:** If the file does not exist, Continue will create it with default values the first time it runs. You can then replace the contents with the configuration below.
+
+### Step 3: Edit the Config File
+
+Replace the contents of your `config.yaml` with the following configuration, substituting the placeholder values with your own.
+
+**Template:**
+
+```yaml
+name: <CONFIG_NAME>
+version: 1.0.0
+schema: v1
+
+models:
+  - name: <MODEL_DISPLAY_NAME_1>
+    provider: anthropic
+    model: <MODEL_ID_1>
+    apiBase: <PROXY_URL>/v1
+    apiKey: <YOUR_VIRTUAL_KEY>
+
+  - name: <MODEL_DISPLAY_NAME_2>
+    provider: anthropic
+    model: <MODEL_ID_2>
+    apiBase: <PROXY_URL>/v1
+    apiKey: <YOUR_VIRTUAL_KEY>
+```
+
+| Placeholder | Description |
+|---|---|
+| `CONFIG_NAME` | A friendly name for this configuration (e.g. `LLMLite Local Config`) |
+| `MODEL_DISPLAY_NAME` | The name shown in the Continue model selector (e.g. `LiteLLM - Claude Sonnet 4.5`) |
+| `MODEL_ID` | The model identifier as configured in LLMLite (see available models below) |
+| `PROXY_URL` | The LLMLite gateway base URL |
+| `YOUR_VIRTUAL_KEY` | Your personal LLMLite virtual API key (begins with `sk-`) |
+
+**Example (using LLMLite AI Engineering Lab gateway):**
+
+```yaml
+name: Continue Chat Local Config
+version: 1.0.0
+schema: v1
+
+models:
+  - name: LiteLLM - Claude Sonnet 4.5
+    provider: anthropic
+    model: eu.anthropic.claude-sonnet-4-5-20250929-v1:0
+    apiBase: https://licenseportal.aiengineeringlab.co.uk/v1
+    apiKey: sk-LWHQPS2seYyIdXABCHykdg
+
+  - name: LiteLLM - Claude Haiku 4.5
+    provider: anthropic
+    model: eu.anthropic.claude-haiku-4-5-20251001-v1:0
+    apiBase: https://licenseportal.aiengineeringlab.co.uk/v1
+    apiKey: sk-LWHQPS2seYyIdXABCHykdg
+```
+
+### Available Models
+
+| Display Name | Model ID | Best For |
+|---|---|---|
+| LiteLLM - Claude Sonnet 4.5 | `eu.anthropic.claude-sonnet-4-5-20250929-v1:0` | General chat, code review, complex tasks |
+| LiteLLM - Claude Haiku 4.5 | `eu.anthropic.claude-haiku-4-5-20251001-v1:0` | Fast responses, simple tasks, autocomplete |
+
+### Step 4: Save and Verify
+
+1. **Save** the `config.yaml` file — Continue reloads the configuration automatically, no restart required
+2. Open the **Continue chat panel** in VS Code (`Ctrl+L` / `Cmd+L`)
+3. Click the **model selector** at the top of the chat input — you should see your configured models listed
+4. Send a test message to confirm the connection is working
+
+### Optional: Enable Tab Autocomplete
+
+Tab autocomplete allows Continue to suggest code completions as you type. To enable it, uncomment and update the `tabAutocompleteModel` section in your `config.yaml`:
+
+**Template:**
+```yaml
+tabAutocompleteModel:
+  name: <MODEL_DISPLAY_NAME>
+  provider: anthropic
+  model: <MODEL_ID>
+  apiBase: <PROXY_URL>/v1
+  apiKey: <YOUR_VIRTUAL_KEY>
+```
+
+**Example:**
+```yaml
+tabAutocompleteModel:
+  name: LiteLLM - Claude Haiku 4.5
+  provider: anthropic
+  model: eu.anthropic.claude-haiku-4-5-20251001-v1:0
+  apiBase: https://licenseportal.aiengineeringlab.co.uk/v1
+  apiKey: sk-LWHQPS2seYyIdXABCHykdg
+```
+
+> **Note:** Claude Haiku 4.5 is recommended for autocomplete due to its faster response time.
 
 ---
 
