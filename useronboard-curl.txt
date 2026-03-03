@@ -1,0 +1,19 @@
+curl -X POST 'https://licenseportal.aiengineeringlab.co.uk/user/new' \
+  -H 'Authorization: Bearer sk-1234' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "user_email": "anastasios.sarellas@nhs.net",
+    "user_role": "internal_user",
+    "teams": ["feb194fa-3f31-4ff9-91c1-a5b3d72b4aca"]
+  }'
+
+
+
+curl -X POST 'https://licenseportal.aiengineeringlab.co.uk/invitation/new' \
+  -H 'Authorization: Bearer sk-1234' \
+  -H 'Content-Type: application/json' \
+  -d '{ "user_id": "751630c7-34b6-495b-9681-b8c9403d1a72" }'
+
+
+
+  https://licenseportal.aiengineeringlab.co.uk/ui/onboarding?id=e28009d9-6235-4609-95d2-cdb9b4d40e35
