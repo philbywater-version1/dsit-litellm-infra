@@ -583,9 +583,7 @@ Save the file — VS Code will reload the configuration automatically.
 
 ## Configuring Claude Code
 
-Claude Code is Anthropic's official agentic coding assistant. It is available as both a **VS Code extension** and a **CLI tool**, and can be configured to route all requests through the LLMLite gateway using two environment variables.
-
-> **Note:** The VS Code extension and the CLI share the same settings file (`~/.claude/settings.json`), so configuring one configures both.
+Claude Code is Anthropic's official agentic coding assistant. It is available as both a **VS Code extension** and a **CLI tool**, and can be configured to route all requests through the LLMLite gateway using environment variables.
 
 ---
 
@@ -596,7 +594,7 @@ Claude Code is Anthropic's official agentic coding assistant. It is available as
 
 ---
 
-### Option A: Configure via `~/.claude/settings.json` (Recommended)
+### Option A: Configure via `~/.claude/settings.json` (CLI & Extension)
 
 This method persists across all terminal sessions and is shared between the CLI and the VS Code extension.
 
@@ -616,17 +614,11 @@ Create or edit the file and add the following `env` block:
     "ANTHROPIC_BASE_URL": "<PROXY_URL>",
     "ANTHROPIC_AUTH_TOKEN": "<YOUR_VIRTUAL_KEY>",
     "ANTHROPIC_DEFAULT_SONNET_MODEL": "<SONNET_MODEL_ID>",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "<HAIKU_MODEL_ID>"
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "<HAIKU_MODEL_ID>",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "<OPUS_MODEL_ID>"
   }
 }
 ```
-
-| Parameter | Description |
-|---|---|
-| `PROXY_URL` | The LLMLite gateway base URL (without `/v1`) |
-| `YOUR_VIRTUAL_KEY` | Your personal LLMLite virtual API key (begins with `sk-`) |
-| `SONNET_MODEL_ID` | The model ID to use for Sonnet-class requests |
-| `HAIKU_MODEL_ID` | The model ID to use for Haiku-class (fast/background) requests |
 
 **Example:**
 ```json
@@ -634,8 +626,9 @@ Create or edit the file and add the following `env` block:
   "env": {
     "ANTHROPIC_BASE_URL": "https://licenseportal.aiengineeringlab.co.uk",
     "ANTHROPIC_AUTH_TOKEN": "sk-xxxxxxxxxxxxxxxxxxxx",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "eu.anthropic.claude-sonnet-4-5-20250929-v1:0",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "eu.anthropic.claude-sonnet-4-6",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "eu.anthropic.claude-haiku-4-5-20251001-v1:0",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "eu.anthropic.claude-opus-4-6-v1"
   }
 }
 ```
@@ -649,32 +642,22 @@ Create or edit the file and add the following `env` block:
 For a quick per-session configuration, export the variables directly in your terminal before launching Claude Code.
 
 **macOS / Linux:**
-
-**Template:**
-```bash
-export ANTHROPIC_BASE_URL="<PROXY_URL>"
-export ANTHROPIC_AUTH_TOKEN="<YOUR_VIRTUAL_KEY>"
-export ANTHROPIC_DEFAULT_SONNET_MODEL="<SONNET_MODEL_ID>"
-export ANTHROPIC_DEFAULT_HAIKU_MODEL="<HAIKU_MODEL_ID>"
-claude
-```
-
-**Example:**
 ```bash
 export ANTHROPIC_BASE_URL="https://licenseportal.aiengineeringlab.co.uk"
 export ANTHROPIC_AUTH_TOKEN="sk-xxxxxxxxxxxxxxxxxxxx"
-export ANTHROPIC_DEFAULT_SONNET_MODEL="eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
+export ANTHROPIC_DEFAULT_SONNET_MODEL="eu.anthropic.claude-sonnet-4-6"
 export ANTHROPIC_DEFAULT_HAIKU_MODEL="eu.anthropic.claude-haiku-4-5-20251001-v1:0"
+export ANTHROPIC_DEFAULT_OPUS_MODEL="eu.anthropic.claude-opus-4-6-v1"
 claude
 ```
 
 **Windows (PowerShell):**
-
 ```powershell
 $env:ANTHROPIC_BASE_URL = "https://licenseportal.aiengineeringlab.co.uk"
 $env:ANTHROPIC_AUTH_TOKEN = "sk-xxxxxxxxxxxxxxxxxxxx"
-$env:ANTHROPIC_DEFAULT_SONNET_MODEL = "eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
+$env:ANTHROPIC_DEFAULT_SONNET_MODEL = "eu.anthropic.claude-sonnet-4-6"
 $env:ANTHROPIC_DEFAULT_HAIKU_MODEL = "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
+$env:ANTHROPIC_DEFAULT_OPUS_MODEL = "eu.anthropic.claude-opus-4-6-v1"
 claude
 ```
 
@@ -682,40 +665,52 @@ claude
 
 ---
 
-### Option C: Configure the VS Code Extension
+### Option C: Configure the VS Code Extension via `settings.json`
 
-If you prefer to configure the Claude Code VS Code extension directly via VS Code settings:
+The Claude Code VS Code extension can be configured directly in your VS Code user settings. This is the recommended approach if you are primarily using the extension rather than the CLI.
 
-1. Open VS Code Settings (`Ctrl+,` / `Cmd+,`)
-2. Search for **Claude Code: Environment Variables**
-3. Click **Edit in settings.json**
-4. Add the following to your VS Code `settings.json`:
+> **Important:** This configuration is separate from `~/.claude/settings.json`. The VS Code extension and the CLI may load configuration differently — if the extension is showing an Anthropic login screen, this option should be used in addition to or instead of Option A.
+
+**Steps:**
+
+1. Open VS Code
+2. Open the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
+3. Run **Preferences: Open User Settings (JSON)**
+4. Add the `claudeCode.environmentVariables` and `claudeCode.selectedModel` entries to your `settings.json`
 
 **Template:**
-```json
+```jsonc
 {
+  // ... your other VS Code settings ...
   "claudeCode.environmentVariables": [
-    { "name": "ANTHROPIC_BASE_URL",              "value": "<PROXY_URL>" },
-    { "name": "ANTHROPIC_AUTH_TOKEN",             "value": "<YOUR_VIRTUAL_KEY>" },
-    { "name": "ANTHROPIC_DEFAULT_SONNET_MODEL",   "value": "<SONNET_MODEL_ID>" },
-    { "name": "ANTHROPIC_DEFAULT_HAIKU_MODEL",    "value": "<HAIKU_MODEL_ID>" }
-  ]
+    { "name": "ANTHROPIC_BASE_URL",            "value": "<PROXY_URL>" },
+    { "name": "ANTHROPIC_AUTH_TOKEN",           "value": "<YOUR_VIRTUAL_KEY>" },
+    { "name": "ANTHROPIC_DEFAULT_SONNET_MODEL", "value": "<SONNET_MODEL_ID>" },
+    { "name": "ANTHROPIC_DEFAULT_HAIKU_MODEL",  "value": "<HAIKU_MODEL_ID>" },
+    { "name": "ANTHROPIC_DEFAULT_OPUS_MODEL",   "value": "<OPUS_MODEL_ID>" }
+  ],
+  "claudeCode.selectedModel": "default"
 }
 ```
 
 **Example:**
-```json
+```jsonc
 {
+  // ... your other VS Code settings ...
   "claudeCode.environmentVariables": [
-    { "name": "ANTHROPIC_BASE_URL",              "value": "https://licenseportal.aiengineeringlab.co.uk" },
-    { "name": "ANTHROPIC_AUTH_TOKEN",             "value": "sk-xxxxxxxxxxxxxxxxxxxx" },
-    { "name": "ANTHROPIC_DEFAULT_SONNET_MODEL",   "value": "eu.anthropic.claude-sonnet-4-5-20250929-v1:0" },
-    { "name": "ANTHROPIC_DEFAULT_HAIKU_MODEL",    "value": "eu.anthropic.claude-haiku-4-5-20251001-v1:0" }
-  ]
+    { "name": "ANTHROPIC_BASE_URL",            "value": "https://licenseportal.aiengineeringlab.co.uk" },
+    { "name": "ANTHROPIC_AUTH_TOKEN",           "value": "sk-xxxxxxxxxxxxxxxxxxxx" },
+    { "name": "ANTHROPIC_DEFAULT_SONNET_MODEL", "value": "eu.anthropic.claude-sonnet-4-6" },
+    { "name": "ANTHROPIC_DEFAULT_HAIKU_MODEL",  "value": "eu.anthropic.claude-haiku-4-5-20251001-v1:0" },
+    { "name": "ANTHROPIC_DEFAULT_OPUS_MODEL",   "value": "eu.anthropic.claude-opus-4-6-v1" }
+  ],
+  "claudeCode.selectedModel": "default"
 }
 ```
 
-Restart VS Code after saving to ensure the settings take effect.
+5. Save the file and **fully restart VS Code** (not just reload the window) for the settings to take effect
+
+> **Note:** The three `ANTHROPIC_DEFAULT_*` variables are the only supported model slots. If you need to use additional models not covered by these three slots, you can switch models at runtime using the `/model <model-id>` command in the Claude Code chat panel.
 
 ---
 
@@ -723,8 +718,9 @@ Restart VS Code after saving to ensure the settings take effect.
 
 | Display Name | Model ID | Used For |
 |---|---|---|
-| Claude Sonnet 4.5 | `eu.anthropic.claude-sonnet-4-5-20250929-v1:0` | Main chat and complex tasks |
+| Claude Sonnet 4.6 | `eu.anthropic.claude-sonnet-4-6` | Main chat and complex tasks |
 | Claude Haiku 4.5 | `eu.anthropic.claude-haiku-4-5-20251001-v1:0` | Fast background tasks |
+| Claude Opus 4.6 | `eu.anthropic.claude-opus-4-6-v1` | Most complex, extended tasks |
 
 ---
 
@@ -745,10 +741,11 @@ Claude Code should respond without prompting for a login and the response should
 | Issue | Resolution |
 |---|---|
 | Login/sign-in prompt appears on first run | On a fresh install, Claude Code may ignore `settings.json` on the very first launch. Workaround: temporarily set `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` as shell environment variables, run `claude` once to complete initialisation, then remove them — `settings.json` will be picked up on subsequent runs. |
-| `401 Unauthorized` | Verify your virtual key is correct and has not expired. Generate a new key via the LLMLite Admin Portal if needed. |
+| VS Code extension shows Anthropic login screen | Ensure the variables are set under `claudeCode.environmentVariables` in your VS Code `settings.json` (Option C above), not just in `~/.claude/settings.json` — the extension and CLI may load configuration differently. |
+| `401 Unauthorized` | Verify your virtual key is correct and has not expired. Generate a new key via the LiteLLM Admin Portal if needed. |
 | `Connection refused` or `Unable to connect` | Check that `ANTHROPIC_BASE_URL` does **not** include `/v1` at the end. |
-| Extension not picking up `settings.json` changes | Fully restart VS Code (`Ctrl+Shift+P` → **Developer: Reload Window**) after editing the settings file. |
-| VS Code extension shows Anthropic login screen | Ensure `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` are set in the VS Code extension settings (Option C above), not just in `settings.json`, as the extension and CLI may load configuration differently. |
+| Extension not picking up settings changes | Fully restart VS Code after editing — a window reload alone may not be sufficient. |
+| Model not found / `400` error | Ensure the model ID matches exactly what is listed in the Available Models table above. Use `/model <model-id>` in the chat panel to switch models at runtime. |
 
 ---
 

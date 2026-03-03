@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:mso="urn:schemas-microsoft-com:office:office" xmlns:msdt="uuid:C2F41010-65B3-11d1-A29F-00AA00C14882">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kiro Enterprise AWS Architecture</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #f0f2f5; font-family: 'Segoe UI', Arial, sans-serif; padding: 16px; }
+  svg { display: block; margin: 0 auto; }
+</style>
+
+<!--[if gte mso 9]><xml>
+<mso:CustomDocumentProperties>
+<mso:m817f42addf14c9a838da36e78800043 msdt:dt="string">GDS|444fcede-209e-4852-86df-859b7c4e54f8</mso:m817f42addf14c9a838da36e78800043>
+<mso:c6f593ada1854b629148449de059396b msdt:dt="string">DSIT|9b2b16d8-8f0e-f9f9-8d2e-30d6eeb93788</mso:c6f593ada1854b629148449de059396b>
+<mso:h573c97cf80c4aa6b446c5363dc3ac94 msdt:dt="string">Office of the Government Chief Technology Officer|a8a6eb5b-5099-4892-bacb-4a22427543b8</mso:h573c97cf80c4aa6b446c5363dc3ac94>
+<mso:TaxCatchAll msdt:dt="string">3;#DSIT;#2;#Office of the Government Chief Technology Officer;#1;#GDS</mso:TaxCatchAll>
+<mso:_dlc_DocId msdt:dt="string">VT2TPC4ERZEH-237637144-347</mso:_dlc_DocId>
+<mso:_dlc_DocIdItemGuid msdt:dt="string">cdc53222-4998-4761-90c4-abb0e00b827c</mso:_dlc_DocIdItemGuid>
+<mso:_dlc_DocIdUrl msdt:dt="string">https://beisgov.sharepoint.com/sites/AIInSDLCProgramme-Deliveryteam-restricted/_layouts/15/DocIdRedir.aspx?ID=VT2TPC4ERZEH-237637144-347, VT2TPC4ERZEH-237637144-347</mso:_dlc_DocIdUrl>
+</mso:CustomDocumentProperties>
+</xml><![endif]-->
+</head>
+<body>
+<svg width="1140" height="980" viewBox="0 0 1140 980" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <marker id="arr" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+    <path d="M0,0 L0,6 L9,3 z" fill="#555"/>
+  </marker>
+  <marker id="arrBlue" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+    <path d="M0,0 L0,6 L9,3 z" fill="#1a73e8"/>
+  </marker>
+  <marker id="arrGreen" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+    <path d="M0,0 L0,6 L9,3 z" fill="#2e7d32"/>
+  </marker>
+  <marker id="arrOrange" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+    <path d="M0,0 L0,6 L9,3 z" fill="#e47911"/>
+  </marker>
+  <marker id="arrPurple" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+    <path d="M0,0 L0,6 L9,3 z" fill="#7b2d8b"/>
+  </marker>
+  <marker id="arrRed" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+    <path d="M0,0 L0,6 L9,3 z" fill="#c62828"/>
+  </marker>
+  <filter id="shadow">
+    <feDropShadow dx="1" dy="2" stdDeviation="2" flood-opacity="0.13"/>
+  </filter>
+</defs>
+
+<!-- ═══════════ BACKGROUND ═══════════ -->
+<rect width="1140" height="980" fill="#f0f2f5" rx="10"/>
+
+<!-- TITLE BLOCK -->
+<rect x="10" y="8" width="1120" height="52" rx="8" fill="#1a1a2e"/>
+<text x="570" y="30" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="800" fill="white" text-anchor="middle">Kiro Enterprise — AWS Architecture &amp; Authentication Flow</text>
+<text x="570" y="50" font-family="Segoe UI,Arial,sans-serif" font-size="11" fill="#aab" text-anchor="middle">Data residency: Europe (Frankfurt) eu-central-1  ·  Authentication: AWS IAM Identity Center  ·  Managed SaaS — no customer VPC required</text>
+
+<!-- ═══════════════════════════════════════════
+     COLUMN 1: DEVELOPER WORKSTATION (left)
+════════════════════════════════════════════ -->
+<rect x="18" y="72" width="240" height="520" rx="10" fill="#e8eaf6" stroke="#5c6bc0" stroke-width="2" stroke-dasharray="6,3"/>
+<rect x="18" y="72" width="240" height="26" rx="10" fill="#5c6bc0"/>
+<rect x="18" y="88" width="240" height="10" rx="0" fill="#5c6bc0"/>
+<text x="138" y="90" font-family="Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="white" text-anchor="middle">Developer Workstation</text>
+
+<!-- Developer person icon -->
+<g transform="translate(138,132)">
+  <circle cx="0" cy="-14" r="16" fill="#5c6bc0" opacity="0.85"/>
+  <rect x="-18" y="2" width="36" height="22" rx="10" fill="#5c6bc0" opacity="0.7"/>
+  <text x="0" y="-9" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="800" fill="white" text-anchor="middle">👤</text>
+  <text x="0" y="38" font-family="Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#1a1a2e" text-anchor="middle">Developer</text>
+  <text x="0" y="52" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555" text-anchor="middle">Corporate network</text>
+</g>
+
+<!-- Kiro IDE Box -->
+<rect x="38" y="210" width="200" height="90" rx="8" fill="white" stroke="#5c6bc0" stroke-width="2" filter="url(#shadow)"/>
+<!-- IDE icon: code brackets -->
+<text x="72" y="248" font-family="Segoe UI,Arial,sans-serif" font-size="28" fill="#5c6bc0">⌨</text>
+<text x="140" y="243" font-family="Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#1a1a2e" text-anchor="middle">Kiro IDE</text>
+<text x="140" y="257" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555" text-anchor="middle">VS Code–based agentic IDE</text>
+<text x="140" y="270" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555" text-anchor="middle">Inline suggestions · Chat · Specs</text>
+<text x="140" y="283" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#888" text-anchor="middle">min. version 0.9.2</text>
+
+<!-- Kiro CLI Box -->
+<rect x="38" y="320" width="200" height="90" rx="8" fill="white" stroke="#5c6bc0" stroke-width="2" filter="url(#shadow)"/>
+<text x="72" y="358" font-family="Segoe UI,Arial,sans-serif" font-size="28" fill="#5c6bc0">$_</text>
+<text x="140" y="353" font-family="Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#1a1a2e" text-anchor="middle">Kiro CLI</text>
+<text x="140" y="367" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555" text-anchor="middle">Terminal-based assistant</text>
+<text x="140" y="380" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555" text-anchor="middle">Device code auth flow</text>
+<text x="140" y="393" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#888" text-anchor="middle">min. version 1.25.0</text>
+
+<!-- Web Browser Box -->
+<rect x="38" y="430" width="200" height="90" rx="8" fill="white" stroke="#5c6bc0" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="72" y="468" font-family="Segoe UI,Arial,sans-serif" font-size="28" fill="#5c6bc0">🌐</text>
+<text x="140" y="463" font-family="Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#1a1a2e" text-anchor="middle">Web Browser</text>
+<text x="140" y="477" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555" text-anchor="middle">SSO redirect for authentication</text>
+<text x="140" y="491" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555" text-anchor="middle">Corporate proxy (port 443)</text>
+<text x="140" y="505" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#888" text-anchor="middle">OIDC / SAML flow</text>
+
+<!-- Corporate Proxy note -->
+<rect x="38" y="540" width="200" height="40" rx="6" fill="#fff3e0" stroke="#e47911" stroke-width="1.5"/>
+<text x="138" y="557" font-family="Segoe UI,Arial,sans-serif" font-size="9" font-weight="700" fill="#b35900" text-anchor="middle">Corporate Firewall / Proxy</text>
+<text x="138" y="570" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#b35900" text-anchor="middle">Allow-list: *.awsapps.com · *.amazonaws.com</text>
+
+<!-- ═══════════════════════════════════════════
+     COLUMN 2: AWS IAM IDENTITY CENTER (middle-left)
+════════════════════════════════════════════ -->
+<rect x="286" y="72" width="230" height="520" rx="10" fill="#e8f5e9" stroke="#2e7d32" stroke-width="2" stroke-dasharray="6,3"/>
+<rect x="286" y="72" width="230" height="26" rx="10" fill="#2e7d32"/>
+<rect x="286" y="88" width="230" height="10" rx="0" fill="#2e7d32"/>
+<text x="401" y="90" font-family="Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="white" text-anchor="middle">IAM Identity Center · eu-central-1</text>
+
+<!-- IAM Identity Center main box -->
+<rect x="302" y="110" width="198" height="100" rx="8" fill="white" stroke="#2e7d32" stroke-width="2" filter="url(#shadow)"/>
+<!-- IdC shield icon -->
+<polygon points="401,122 420,130 420,148 401,158 382,148 382,130" fill="#2e7d32" opacity="0.85"/>
+<text x="401" y="144" font-family="Segoe UI,Arial,sans-serif" font-size="9" font-weight="700" fill="white" text-anchor="middle">IdC</text>
+<text x="401" y="170" font-family="Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#1a1a2e" text-anchor="middle">IAM Identity Center</text>
+<text x="401" y="184" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555" text-anchor="middle">SSO Portal &amp; token issuance</text>
+<text x="401" y="198" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555" text-anchor="middle">Start URL: d-xxxx.awsapps.com/start</text>
+
+<!-- Session config note -->
+<rect x="302" y="225" width="198" height="36" rx="5" fill="#f1f8e9" stroke="#66bb6a" stroke-width="1"/>
+<text x="401" y="240" font-family="Segoe UI,Arial,sans-serif" font-size="9" font-weight="700" fill="#2e7d32" text-anchor="middle">Session: 8 hrs default · MFA enforced</text>
+<text x="401" y="253" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#555" text-anchor="middle">Configurable timeout · OIDC token exchange</text>
+
+<!-- Built-in directory -->
+<rect x="302" y="278" width="198" height="72" rx="8" fill="white" stroke="#2e7d32" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="340" y="305" font-family="Segoe UI,Arial,sans-serif" font-size="22" fill="#2e7d32">🗂</text>
+<text x="401" y="303" font-family="Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#1a1a2e" text-anchor="middle">Built-in Directory</text>
+<text x="401" y="317" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555" text-anchor="middle">kiro-developers group</text>
+<text x="401" y="330" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555" text-anchor="middle">kiro-admins group</text>
+<text x="401" y="343" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#888" text-anchor="middle">Or synced from external IdP via SCIM</text>
+
+<!-- OR divider -->
+<line x1="360" y1="360" x2="441" y2="360" stroke="#ccc" stroke-width="1"/>
+<rect x="385" y="352" width="32" height="16" rx="8" fill="#e8f5e9"/>
+<text x="401" y="364" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#888" text-anchor="middle">— OR —</text>
+
+<!-- External IdP box -->
+<rect x="302" y="375" width="198" height="82" rx="8" fill="white" stroke="#2e7d32" stroke-width="1.5" stroke-dasharray="5,3" filter="url(#shadow)"/>
+<text x="340" y="404" font-family="Segoe UI,Arial,sans-serif" font-size="22" fill="#2e7d32">🔗</text>
+<text x="401" y="402" font-family="Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#1a1a2e" text-anchor="middle">External IdP</text>
+<text x="401" y="416" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555" text-anchor="middle">Microsoft Entra ID</text>
+<text x="401" y="429" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555" text-anchor="middle">Okta · SAML 2.0 / OIDC</text>
+<text x="401" y="443" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#888" text-anchor="middle">SCIM auto-provisioning</text>
+<text x="401" y="456" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#888" text-anchor="middle">Corporate credentials</text>
+
+<!-- Service-linked roles note -->
+<rect x="302" y="470" width="198" height="50" rx="6" fill="#e8f5e9" stroke="#43a047" stroke-width="1"/>
+<text x="401" y="487" font-family="Segoe UI,Arial,sans-serif" font-size="9" font-weight="700" fill="#1b5e20" text-anchor="middle">Auto-created Service-linked Roles</text>
+<text x="401" y="500" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#555" text-anchor="middle">AWSServiceRoleForUserSubscriptions</text>
+<text x="401" y="512" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#555" text-anchor="middle">AWSServiceRoleForAmazonQDeveloper</text>
+
+<!-- Admin note -->
+<rect x="302" y="534" width="198" height="46" rx="6" fill="#fff3e0" stroke="#e47911" stroke-width="1.5"/>
+<text x="401" y="551" font-family="Segoe UI,Arial,sans-serif" font-size="9" font-weight="700" fill="#b35900" text-anchor="middle">Admin / IT</text>
+<text x="401" y="564" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#555" text-anchor="middle">Manages subscriptions &amp; groups</text>
+<text x="401" y="576" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#555" text-anchor="middle">Kiro Console (AWS Mgmt Console)</text>
+
+<!-- ═══════════════════════════════════════════
+     COLUMN 3: KIRO SERVICE (middle)
+════════════════════════════════════════════ -->
+<rect x="544" y="72" width="248" height="520" rx="10" fill="#fce4ec" stroke="#c62828" stroke-width="2" stroke-dasharray="6,3"/>
+<rect x="544" y="72" width="248" height="26" rx="10" fill="#c62828"/>
+<rect x="544" y="88" width="248" height="10" rx="0" fill="#c62828"/>
+<text x="668" y="90" font-family="Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="white" text-anchor="middle">Kiro Service · AWS Managed · eu-central-1</text>
+
+<!-- Kiro Service main box -->
+<rect x="560" y="110" width="216" height="100" rx="8" fill="white" stroke="#c62828" stroke-width="2" filter="url(#shadow)"/>
+<polygon points="668,120 692,132 692,156 668,168 644,156 644,132" fill="#c62828" opacity="0.8"/>
+<text x="668" y="148" font-family="Segoe UI,Arial,sans-serif" font-size="8" font-weight="800" fill="white" text-anchor="middle">KIRO</text>
+<text x="668" y="172" font-family="Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="#1a1a2e" text-anchor="middle">Kiro Service</text>
+<text x="668" y="186" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555" text-anchor="middle">Subscription validation</text>
+<text x="668" y="200" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555" text-anchor="middle">Request routing · Inference orchestration</text>
+
+<!-- Kiro Profile box -->
+<rect x="560" y="225" width="216" height="72" rx="8" fill="white" stroke="#c62828" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="597" y="256" font-family="Segoe UI,Arial,sans-serif" font-size="22" fill="#c62828">⚙</text>
+<text x="668" y="252" font-family="Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#1a1a2e" text-anchor="middle">Kiro Profile</text>
+<text x="668" y="266" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555" text-anchor="middle">Region: eu-central-1 (Frankfurt)</text>
+<text x="668" y="279" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555" text-anchor="middle">Identity · Subscriptions · Settings</text>
+<text x="668" y="291" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#c62828" text-anchor="middle">⚠ Region cannot be changed post-creation</text>
+
+<!-- Data stored here callout -->
+<rect x="560" y="308" width="216" height="36" rx="5" fill="#ffebee" stroke="#ef9a9a" stroke-width="1"/>
+<text x="668" y="323" font-family="Segoe UI,Arial,sans-serif" font-size="9" font-weight="700" fill="#b71c1c" text-anchor="middle">📍 All data stored here (eu-central-1)</text>
+<text x="668" y="337" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#555" text-anchor="middle">Prompts · Responses · Code context</text>
+
+<!-- KMS box -->
+<rect x="560" y="356" width="100" height="78" rx="8" fill="white" stroke="#7b2d8b" stroke-width="1.5" filter="url(#shadow)"/>
+<polygon points="610,366 624,374 624,390 610,398 596,390 596,374" fill="#7b2d8b" opacity="0.8"/>
+<text x="610" y="383" font-family="Segoe UI,Arial,sans-serif" font-size="7" font-weight="800" fill="white" text-anchor="middle">KMS</text>
+<text x="610" y="410" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" fill="#1a1a2e" text-anchor="middle">AWS KMS</text>
+<text x="610" y="422" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#555" text-anchor="middle">Customer</text>
+<text x="610" y="433" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#555" text-anchor="middle">Managed Key</text>
+
+<!-- Prompt Logging S3 box -->
+<rect x="674" y="356" width="102" height="78" rx="8" fill="white" stroke="#e47911" stroke-width="1.5" filter="url(#shadow)"/>
+<ellipse cx="725" cy="374" rx="16" ry="7" fill="#e47911" opacity="0.8"/>
+<rect x="709" y="374" width="32" height="14" fill="#e47911" opacity="0.5"/>
+<ellipse cx="725" cy="388" rx="16" ry="7" fill="#e47911" opacity="0.7"/>
+<text x="725" y="410" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" fill="#1a1a2e" text-anchor="middle">S3 Bucket</text>
+<text x="725" y="422" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#555" text-anchor="middle">Prompt Logs</text>
+<text x="725" y="433" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#555" text-anchor="middle">eu-central-1</text>
+
+<!-- Activity Reports S3 -->
+<rect x="560" y="448" width="216" height="55" rx="8" fill="white" stroke="#e47911" stroke-width="1.5" filter="url(#shadow)"/>
+<ellipse cx="598" cy="463" rx="13" ry="5" fill="#e47911" opacity="0.7"/>
+<rect x="585" y="463" width="26" height="11" fill="#e47911" opacity="0.45"/>
+<ellipse cx="598" cy="474" rx="13" ry="5" fill="#e47911" opacity="0.6"/>
+<text x="668" y="467" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" fill="#1a1a2e" text-anchor="middle">S3 — User Activity Reports</text>
+<text x="668" y="480" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#555" text-anchor="middle">Daily per-user telemetry export</text>
+<text x="668" y="493" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#555" text-anchor="middle">KMS encrypted · Versioning enabled</text>
+
+<!-- CloudWatch box -->
+<rect x="560" y="516" width="100" height="66" rx="8" fill="white" stroke="#e47911" stroke-width="1.5" filter="url(#shadow)"/>
+<path d="M577,535 Q590,522 603,535 Q615,548 628,535" fill="none" stroke="#e47911" stroke-width="2.5"/>
+<path d="M577,547 Q590,534 603,547 Q615,560 628,547" fill="none" stroke="#e47911" stroke-width="1.5" opacity="0.5"/>
+<text x="610" y="568" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" fill="#1a1a2e" text-anchor="middle">CloudWatch</text>
+<text x="610" y="579" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#555" text-anchor="middle">AWS/Q metrics</text>
+
+<!-- CloudTrail box -->
+<rect x="675" y="516" width="101" height="66" rx="8" fill="white" stroke="#e47911" stroke-width="1.5" filter="url(#shadow)"/>
+<path d="M687,532 L699,540 L725,526 L738,534" fill="none" stroke="#e47911" stroke-width="2"/>
+<circle cx="687" cy="532" r="3" fill="#e47911"/>
+<circle cx="699" cy="540" r="3" fill="#e47911"/>
+<circle cx="725" cy="526" r="3" fill="#e47911"/>
+<circle cx="738" cy="534" r="3" fill="#e47911"/>
+<text x="726" y="568" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" fill="#1a1a2e" text-anchor="middle">CloudTrail</text>
+<text x="726" y="579" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#555" text-anchor="middle">API audit logs</text>
+
+<!-- ═══════════════════════════════════════════
+     COLUMN 4: AMAZON BEDROCK (right)
+════════════════════════════════════════════ -->
+<rect x="820" y="72" width="302" height="520" rx="10" fill="#f3e5f5" stroke="#7b2d8b" stroke-width="2" stroke-dasharray="6,3"/>
+<rect x="820" y="72" width="302" height="26" rx="10" fill="#7b2d8b"/>
+<rect x="820" y="88" width="302" height="10" rx="0" fill="#7b2d8b"/>
+<text x="971" y="90" font-family="Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="white" text-anchor="middle">Amazon Bedrock · AI Inference</text>
+
+<!-- Bedrock main box -->
+<rect x="836" y="110" width="270" height="100" rx="8" fill="white" stroke="#7b2d8b" stroke-width="2" filter="url(#shadow)"/>
+<polygon points="895,122 920,135 920,160 895,173 870,160 870,135" fill="#7b2d8b" opacity="0.8"/>
+<text x="895" y="151" font-family="Segoe UI,Arial,sans-serif" font-size="8" font-weight="800" fill="white" text-anchor="middle">Bedrock</text>
+<text x="971" y="140" font-family="Segoe UI,Arial,sans-serif" font-size="13" font-weight="700" fill="#1a1a2e" text-anchor="middle">Amazon Bedrock</text>
+<text x="971" y="156" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555" text-anchor="middle">LLM inference powered by Claude models</text>
+<text x="971" y="170" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555" text-anchor="middle">Managed by AWS — no customer config required</text>
+<text x="971" y="184" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#888" text-anchor="middle">TLS 1.2+ between Kiro Service and Bedrock</text>
+
+<!-- Claude models -->
+<rect x="836" y="225" width="130" height="82" rx="8" fill="white" stroke="#7b2d8b" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="901" y="249" font-family="Segoe UI,Arial,sans-serif" font-size="22" fill="#7b2d8b">🤖</text>
+<text x="901" y="268" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" fill="#1a1a2e" text-anchor="middle">Claude Models</text>
+<text x="901" y="281" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#555" text-anchor="middle">Sonnet 4 · Auto-select</text>
+<text x="901" y="294" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#555" text-anchor="middle">Inline · Chat · Agents</text>
+<text x="901" y="307" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#888" text-anchor="middle">by Anthropic</text>
+
+<!-- Cross-region inference -->
+<rect x="978" y="225" width="128" height="82" rx="8" fill="white" stroke="#7b2d8b" stroke-width="1.5" stroke-dasharray="5,3" filter="url(#shadow)"/>
+<text x="1042" y="249" font-family="Segoe UI,Arial,sans-serif" font-size="20" fill="#7b2d8b">⇄</text>
+<text x="1042" y="268" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" fill="#1a1a2e" text-anchor="middle">Cross-Region</text>
+<text x="1042" y="281" font-family="Segoe UI,Arial,sans-serif" font-size="9" font-weight="700" fill="#1a1a2e" text-anchor="middle">Inference (EU)</text>
+<text x="1042" y="294" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#555" text-anchor="middle">Throughput &amp; resilience</text>
+<text x="1042" y="307" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#888" text-anchor="middle">Data stays in eu-central-1</text>
+
+<!-- Data residency guarantee -->
+<rect x="836" y="320" width="270" height="38" rx="6" fill="#f3e5f5" stroke="#ab47bc" stroke-width="1"/>
+<text x="971" y="337" font-family="Segoe UI,Arial,sans-serif" font-size="9" font-weight="700" fill="#6a1b9a" text-anchor="middle">✅ Data residency guarantee</text>
+<text x="971" y="350" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#555" text-anchor="middle">Cross-region inference does not affect where data is stored</text>
+
+<!-- No customer VPC note -->
+<rect x="836" y="370" width="270" height="54" rx="8" fill="white" stroke="#7b2d8b" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="971" y="392" font-family="Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#1a1a2e" text-anchor="middle">Fully Managed SaaS</text>
+<text x="971" y="406" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555" text-anchor="middle">No customer VPC or infrastructure required</text>
+<text x="971" y="419" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#888" text-anchor="middle">Developers connect outbound over HTTPS (TLS 1.2+)</text>
+
+<!-- Content not used for training -->
+<rect x="836" y="438" width="270" height="54" rx="8" fill="#f3e5f5" stroke="#7b2d8b" stroke-width="1.5"/>
+<text x="971" y="459" font-family="Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#6a1b9a" text-anchor="middle">🔒 Enterprise Content Policy</text>
+<text x="971" y="473" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555" text-anchor="middle">Enterprise users automatically opted out of</text>
+<text x="971" y="487" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555" text-anchor="middle">content collection &amp; service improvement</text>
+
+<!-- Encryption in transit note -->
+<rect x="836" y="506" width="270" height="76" rx="8" fill="white" stroke="#7b2d8b" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="971" y="526" font-family="Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#1a1a2e" text-anchor="middle">Encryption</text>
+<text x="971" y="541" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555" text-anchor="middle">In transit: TLS 1.2+ all endpoints</text>
+<text x="971" y="555" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555" text-anchor="middle">At rest: Customer Managed KMS Key</text>
+<text x="971" y="569" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555" text-anchor="middle">Symmetric AES-256 · Annual key rotation</text>
+
+<!-- ═══════════════════════════════════════════════════════════
+     NUMBERED FLOW ARROWS
+═══════════════════════════════════════════════════════════ -->
+
+<!-- STEP 1: Developer → Kiro IDE (already in same box, just label it) -->
+<circle cx="57" cy="218" r="10" fill="#5c6bc0"/>
+<text x="57" y="222" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="800" fill="white" text-anchor="middle">1</text>
+<text x="80" y="205" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#3949ab">Opens IDE,</text>
+<text x="80" y="215" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#3949ab">initiates login</text>
+
+<!-- STEP 2: IDE → Browser (inside workstation col) -->
+<line x1="138" y1="300" x2="138" y2="428" stroke="#5c6bc0" stroke-width="2" marker-end="url(#arrBlue)" stroke-dasharray="5,3"/>
+<circle cx="108" cy="364" r="10" fill="#5c6bc0"/>
+<text x="108" y="368" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="800" fill="white" text-anchor="middle">2</text>
+<text x="155" y="356" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#3949ab">IDE opens</text>
+<text x="155" y="367" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#3949ab">browser for</text>
+<text x="155" y="378" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#3949ab">SSO redirect</text>
+
+<!-- STEP 3: Browser → IAM Identity Center -->
+<line x1="238" y1="470" x2="302" y2="360" stroke="#2e7d32" stroke-width="2.5" marker-end="url(#arrGreen)"/>
+<circle cx="262" cy="422" r="10" fill="#2e7d32"/>
+<text x="262" y="426" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="800" fill="white" text-anchor="middle">3</text>
+<text x="275" y="410" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#1b5e20">Browser</text>
+<text x="275" y="421" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#1b5e20">authenticates</text>
+<text x="275" y="432" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#1b5e20">OIDC / SAML</text>
+
+<!-- STEP 4: IdC → Directory (internal, label only) -->
+<line x1="401" y1="210" x2="401" y2="276" stroke="#2e7d32" stroke-width="2" marker-end="url(#arrGreen)" stroke-dasharray="4,2"/>
+<circle cx="371" cy="243" r="10" fill="#2e7d32"/>
+<text x="371" y="247" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="800" fill="white" text-anchor="middle">4</text>
+<text x="415" y="237" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#1b5e20">Validates user</text>
+<text x="415" y="248" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#1b5e20">in directory</text>
+
+<!-- STEP 5: IAM IdC → IDE (token return) -->
+<path d="M 401 130 Q 300 80 138 128" fill="none" stroke="#2e7d32" stroke-width="2.5" stroke-dasharray="6,3" marker-end="url(#arrGreen)"/>
+<circle cx="252" cy="92" r="10" fill="#2e7d32"/>
+<text x="252" y="96" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="800" fill="white" text-anchor="middle">5</text>
+<text x="220" y="78" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#1b5e20">OIDC token</text>
+<text x="220" y="89" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#1b5e20">returned to IDE</text>
+
+<!-- STEP 6: IDE → Kiro Service (authenticated requests) -->
+<line x1="238" y1="255" x2="558" y2="200" stroke="#c62828" stroke-width="2.5" marker-end="url(#arrRed)"/>
+<circle cx="392" cy="233" r="10" fill="#c62828"/>
+<text x="392" y="237" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="800" fill="white" text-anchor="middle">6</text>
+<text x="360" y="220" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#b71c1c">Prompts &amp; requests</text>
+<text x="360" y="231" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#b71c1c">HTTPS TLS 1.2+</text>
+
+<!-- STEP 7: Kiro Service → Bedrock -->
+<line x1="760" y1="185" x2="834" y2="175" stroke="#7b2d8b" stroke-width="2.5" marker-end="url(#arrPurple)"/>
+<circle cx="795" cy="183" r="10" fill="#7b2d8b"/>
+<text x="795" y="187" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="800" fill="white" text-anchor="middle">7</text>
+<text x="772" y="168" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#6a1b9a">Inference</text>
+<text x="772" y="179" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#6a1b9a">request</text>
+
+<!-- STEP 8: Kiro Service → S3 (Prompt logging) -->
+<line x1="700" y1="305" x2="706" y2="356" stroke="#e47911" stroke-width="2" stroke-dasharray="4,2" marker-end="url(#arrOrange)"/>
+<circle cx="700" cy="330" r="10" fill="#e47911"/>
+<text x="700" y="334" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="800" fill="white" text-anchor="middle">8</text>
+<text x="716" y="325" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#b35900">Prompt logs</text>
+<text x="716" y="336" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#b35900">written to S3</text>
+
+<!-- Bedrock response back arrow -->
+<path d="M 836 210 Q 800 240 762 220" fill="none" stroke="#7b2d8b" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#arrPurple)"/>
+<text x="793" y="232" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#6a1b9a">Response</text>
+
+<!-- IDE response back arrow -->
+<path d="M 558 215 Q 400 245 240 265" fill="none" stroke="#c62828" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#arrRed)"/>
+<text x="390" y="258" font-family="Segoe UI,Arial,sans-serif" font-size="8" fill="#b71c1c">Code / response returned</text>
+
+<!-- ═══════════════════════════════════════════
+     BOTTOM SECTION: LEGEND + ONBOARDING STEPS
+════════════════════════════════════════════ -->
+<rect x="18" y="608" width="542" height="356" rx="10" fill="white" stroke="#1a1a2e" stroke-width="1.5" filter="url(#shadow)"/>
+<rect x="18" y="608" width="542" height="30" rx="10" fill="#1a1a2e"/>
+<rect x="18" y="628" width="542" height="10" rx="0" fill="#1a1a2e"/>
+<text x="289" y="628" font-family="Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="white" text-anchor="middle">Enterprise Onboarding — 5 Steps (Admin One-Time Setup)</text>
+
+<!-- Step boxes in the legend -->
+<!-- Step 1 -->
+<rect x="30" y="650" width="516" height="46" rx="6" fill="#e8eaf6" stroke="#5c6bc0" stroke-width="1"/>
+<circle cx="52" cy="673" r="13" fill="#5c6bc0"/>
+<text x="52" y="677" font-family="Segoe UI,Arial,sans-serif" font-size="11" font-weight="800" fill="white" text-anchor="middle">1</text>
+<text x="73" y="665" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" fill="#1a1a2e">Create / confirm AWS account</text>
+<text x="73" y="679" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555">Use existing account or create new. Recommend AWS Organizations for multi-account.</text>
+<text x="73" y="691" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555">Ensure admin-level IAM permissions for Kiro setup.</text>
+
+<!-- Step 2 -->
+<rect x="30" y="702" width="516" height="46" rx="6" fill="#e8f5e9" stroke="#2e7d32" stroke-width="1"/>
+<circle cx="52" cy="725" r="13" fill="#2e7d32"/>
+<text x="52" y="729" font-family="Segoe UI,Arial,sans-serif" font-size="11" font-weight="800" fill="white" text-anchor="middle">2</text>
+<text x="73" y="717" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" fill="#1a1a2e">Sign in with appropriate IAM permissions</text>
+<text x="73" y="731" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555">Attach Kiro admin IAM policy to your role. Avoid root or full AdministratorAccess.</text>
+<text x="73" y="743" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555">Policy requires: q:*, sso:*, sso-directory:*, kms:* permissions.</text>
+
+<!-- Step 3 -->
+<rect x="30" y="754" width="516" height="46" rx="6" fill="#e8f5e9" stroke="#2e7d32" stroke-width="1"/>
+<circle cx="52" cy="777" r="13" fill="#2e7d32"/>
+<text x="52" y="781" font-family="Segoe UI,Arial,sans-serif" font-size="11" font-weight="800" fill="white" text-anchor="middle">3</text>
+<text x="73" y="769" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" fill="#1a1a2e">Enable IAM Identity Center in eu-central-1 · Configure users &amp; groups</text>
+<text x="73" y="783" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555">Connect external IdP (Entra ID / Okta) via SCIM + SAML, or use Built-in Directory.</text>
+<text x="73" y="795" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555">Create groups: kiro-developers · kiro-admins. Enable MFA for all users.</text>
+
+<!-- Step 4 -->
+<rect x="30" y="806" width="516" height="46" rx="6" fill="#fce4ec" stroke="#c62828" stroke-width="1"/>
+<circle cx="52" cy="829" r="13" fill="#c62828"/>
+<text x="52" y="833" font-family="Segoe UI,Arial,sans-serif" font-size="11" font-weight="800" fill="white" text-anchor="middle">4</text>
+<text x="73" y="821" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" fill="#1a1a2e">Create Kiro Profile in eu-central-1 · Subscribe users  ⚠ Set region BEFORE creating</text>
+<text x="73" y="835" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555">Navigate to Kiro Console → Sign up. Select eu-central-1 (Frankfurt). Configure Customer</text>
+<text x="73" y="847" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555">Managed KMS key, enable Prompt Logging (S3 bucket in eu-central-1), subscribe kiro-developers.</text>
+
+<!-- Step 5 -->
+<rect x="30" y="858" width="516" height="46" rx="6" fill="#f3e5f5" stroke="#7b2d8b" stroke-width="1"/>
+<circle cx="52" cy="881" r="13" fill="#7b2d8b"/>
+<text x="52" y="885" font-family="Segoe UI,Arial,sans-serif" font-size="11" font-weight="800" fill="white" text-anchor="middle">5</text>
+<text x="73" y="873" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" fill="#1a1a2e">Users check email · Download Kiro IDE / CLI · Sign in</text>
+<text x="73" y="887" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555">Email arrives within 24 hrs. Developer installs IDE → "Sign in with IAM Identity Center"</text>
+<text x="73" y="899" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555">Start URL: d-xxxx.awsapps.com/start  ·  Region: eu-central-1  ·  Complete browser SSO.</text>
+
+<!-- ═══════ LEGEND (right, bottom) ═══════ -->
+<rect x="578" y="608" width="544" height="356" rx="10" fill="white" stroke="#1a1a2e" stroke-width="1.5" filter="url(#shadow)"/>
+<rect x="578" y="608" width="544" height="30" rx="10" fill="#1a1a2e"/>
+<rect x="578" y="628" width="544" height="10" rx="0" fill="#1a1a2e"/>
+<text x="850" y="628" font-family="Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" fill="white" text-anchor="middle">Flow Legend &amp; Key Security Controls</text>
+
+<!-- Flow legend -->
+<text x="592" y="660" font-family="Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#1a1a2e">Authentication &amp; Data Flows</text>
+
+<line x1="592" y1="680" x2="640" y2="680" stroke="#5c6bc0" stroke-width="2.5" marker-end="url(#arrBlue)"/>
+<text x="648" y="684" font-family="Segoe UI,Arial,sans-serif" font-size="10" fill="#333">Developer action (open IDE, initiate login)</text>
+
+<line x1="592" y1="700" x2="640" y2="700" stroke="#2e7d32" stroke-width="2.5" marker-end="url(#arrGreen)"/>
+<text x="648" y="704" font-family="Segoe UI,Arial,sans-serif" font-size="10" fill="#333">Authentication flow (OIDC / SAML / token)</text>
+
+<line x1="592" y1="720" x2="640" y2="720" stroke="#c62828" stroke-width="2.5" marker-end="url(#arrRed)"/>
+<text x="648" y="724" font-family="Segoe UI,Arial,sans-serif" font-size="10" fill="#333">Prompt / response (IDE ↔ Kiro Service)</text>
+
+<line x1="592" y1="740" x2="640" y2="740" stroke="#7b2d8b" stroke-width="2.5" marker-end="url(#arrPurple)"/>
+<text x="648" y="744" font-family="Segoe UI,Arial,sans-serif" font-size="10" fill="#333">LLM inference (Kiro Service ↔ Bedrock)</text>
+
+<line x1="592" y1="760" x2="640" y2="760" stroke="#e47911" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#arrOrange)"/>
+<text x="648" y="764" font-family="Segoe UI,Arial,sans-serif" font-size="10" fill="#333">Logging / audit (prompts, metrics, CloudTrail)</text>
+
+<!-- Security controls list -->
+<line x1="592" y1="790" x2="1108" y2="790" stroke="#eee" stroke-width="1"/>
+<text x="592" y="810" font-family="Segoe UI,Arial,sans-serif" font-size="11" font-weight="700" fill="#1a1a2e">Key Security Controls</text>
+
+<rect x="592" y="820" width="248" height="130" rx="6" fill="#f9f9f9" stroke="#ddd" stroke-width="1"/>
+<text x="604" y="838" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" fill="#333">Identity &amp; Access</text>
+<text x="604" y="854" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555">✅  IAM Identity Center SSO</text>
+<text x="604" y="868" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555">✅  MFA enforced</text>
+<text x="604" y="882" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555">✅  Group-based subscriptions</text>
+<text x="604" y="896" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555">✅  8hr session timeout (configurable)</text>
+<text x="604" y="910" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555">✅  Least-privilege admin IAM policy</text>
+<text x="604" y="924" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555">✅  Service-linked roles (auto-created)</text>
+<text x="604" y="938" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555">✅  External IdP (Entra / Okta)</text>
+
+<rect x="850" y="820" width="258" height="130" rx="6" fill="#f9f9f9" stroke="#ddd" stroke-width="1"/>
+<text x="862" y="838" font-family="Segoe UI,Arial,sans-serif" font-size="10" font-weight="700" fill="#333">Data Protection &amp; Compliance</text>
+<text x="862" y="854" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555">✅  Data stored in eu-central-1 (GDPR)</text>
+<text x="862" y="868" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555">✅  Customer Managed KMS Key (AES-256)</text>
+<text x="862" y="882" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555">✅  TLS 1.2+ encryption in transit</text>
+<text x="862" y="896" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555">✅  Prompt logging → S3 (audit trail)</text>
+<text x="862" y="910" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555">✅  CloudTrail API audit logging</text>
+<text x="862" y="924" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555">✅  Enterprise auto opt-out from AWS ML</text>
+<text x="862" y="938" font-family="Segoe UI,Arial,sans-serif" font-size="9" fill="#555">✅  Annual KMS key rotation</text>
+
+</svg>
+</body>
+</html>
