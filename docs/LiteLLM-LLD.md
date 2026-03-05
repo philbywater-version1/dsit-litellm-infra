@@ -1,8 +1,8 @@
 # LLMLite Gateway Service Low-Level Design Document
 ## LLM Gateway using LiteLLM Virtual Keys Authentication with Amazon Bedrock Integration
 
-**Document Version:** 1.2
-**Date:** 2026-02-23
+**Document Version:** 1.3
+**Date:** 2026-03-05
 **Status:** Approved for Implementation
 **Target Audience:** Infrastructure Team, DevOps Engineers, Cloud Architects
 
@@ -38,6 +38,7 @@
 - ✅ **Claude Model Access** - Claude 3.5 Sonnet and Claude 3 Opus via Amazon Bedrock
 - ✅ **Enterprise Security** - API key rotation, rate limiting, audit logging
 - ✅ **Web Application Firewall** - AWS WAF v2 protecting the ALB against common web exploits
+- ✅ **Security Hub** - Centralised security posture management, findings aggregation and compliance standards
 - ✅ **Relational Database** - PostgreSQL on RDS for ACID compliance and data integrity
 - ✅ **Rate Limiting** - Per-key rate limits (100 req/hr standard, 1000 req/hr admin)
 - ✅ **Content Filtering** - PII detection and blocking
@@ -52,6 +53,7 @@
 |-------|------------|---------|
 | **Authentication** | LiteLLM Virtual Keys | Simple API key-based authentication |
 | **WAF** | AWS WAF v2 | Web application firewall, DDoS and exploit protection |
+| **Security Posture** | AWS Security Hub | Centralised findings, compliance standards (CIS, FSBP) |
 | **Compute** | AWS Fargate (ECS) | Serverless container hosting |
 | **Proxy** | LiteLLM Proxy | OpenAI-compatible API gateway |
 | **Load Balancing** | Application Load Balancer | HTTPS endpoint, SSL termination |
@@ -71,12 +73,13 @@
 
 **Problem:** Users need secure, controlled access to Claude LLMs for business applications without complex AWS credential management.
 
-**Solution:** LiteLLM proxy gateway that validates virtual API keys, enforces rate limits, filters content, and routes to Bedrock Claude models. AWS WAF provides an additional layer of protection at the edge. PostgreSQL provides reliable, transactional storage for key management.
+**Solution:** LiteLLM proxy gateway that validates virtual API keys, enforces rate limits, filters content, and routes to Bedrock Claude models. AWS WAF provides an additional layer of protection at the edge. AWS Security Hub provides continuous security posture management and compliance monitoring. PostgreSQL provides reliable, transactional storage for key management.
 
 **Benefits:**
 - Simple authentication: Single API key for all access
 - No AWS credential management required
 - WAF protection against OWASP Top 10 and common API threats
+- Security Hub centralises findings from WAF, GuardDuty, Inspector, and Config
 - ACID-compliant database for data integrity
 - Fast deployment: 1-2 days to production
 - Minimal operational overhead
@@ -110,7 +113,8 @@
 │                       │                                         │
 │  ┌────────────────────▼───────────────────────────────────┐   │
 │  │         Application Load Balancer                      │   │
-│  │  • HTTPS Endpoint  • SSL/TLS Termination              │   │
+│  │  • HTTPS Endpoint (licenseportal.aiengineering.co.uk) │   │
+│  │  • SSL/TLS Termination (ACM Certificate)              │   │
 │  └────────────────────┬───────────────────────────────────┘   │
 │                       │                                         │
 │  ┌────────────────────▼───────────────────────────────────┐   │
@@ -139,6 +143,7 @@
 │  ┌────────────────────────────────────────────────────────┐   │
 │  │    Supporting Services                                 │   │
 │  │  • S3 (logs)  • CloudWatch  • KMS  • VPC              │   │
+│  │  • Security Hub (posture management & compliance)     │   │
 │  └────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -157,7 +162,7 @@ FLOW 1: USER REQUEST (Chat Completion)
 ┌──────────────┐
 │  User Client │  (IDE, Script, Application)
 └──────┬───────┘
-       │ [1] HTTPS POST /v1/chat/completions
+       │ [1] HTTPS POST https://licenseportal.aiengineering.co.uk/v1/chat/completions
        │     Headers: Authorization: Bearer sk-xxx
        │     Body: { model, messages, max_tokens, ... }
        │     TLS 1.3 Encrypted
@@ -175,7 +180,8 @@ FLOW 1: USER REQUEST (Chat Completion)
 ┌────────────────────────────────────────────────────────┐
 │  Application Load Balancer (10.1.1.10, 10.1.2.10)     │
 │  • Terminates SSL/TLS                                  │
-│  • Validates certificate                               │
+│  • Validates ACM certificate                           │
+│  • licenseportal.aiengineering.co.uk → Fargate:4000   │
 │  • Performs health checks                              │
 └────────────────────┬───────────────────────────────────┘
                      │ [2] HTTP Forwarding (internal)
@@ -324,7 +330,15 @@ FLOW 2: AUDIT LOGGING (Parallel Process)
         │  /ecs/llmlite-proxy │ │  Audit Logs     │ │  Metrics       │
         │  [A3] Real-time     │ │  [A4] Long-term │ │  [A5] Metrics  │
         │      monitoring     │ │      archive    │ │      tracking  │
-        └─────────────────────┘ └─────────────────┘ └────────────────┘
+        └──────────┬──────────┘ └─────────────────┘ └────────────────┘
+                   │
+                   │ [A6] Findings forwarded
+                   ▼
+        ┌─────────────────────┐
+        │  AWS Security Hub   │
+        │  Aggregated findings│
+        │  Compliance checks  │
+        └─────────────────────┘
 
 
 FLOW 2b: WAF LOGGING (Parallel Process)
@@ -348,7 +362,14 @@ FLOW 2b: WAF LOGGING (Parallel Process)
         │  llmlite            │ │  (long-term)        │
         │  [W3] Real-time     │ │  [W4] Archive       │
         │      monitoring     │ │                     │
-        └─────────────────────┘ └─────────────────────┘
+        └──────────┬──────────┘ └─────────────────────┘
+                   │
+                   │ [W5] WAF findings forwarded
+                   ▼
+        ┌─────────────────────┐
+        │  AWS Security Hub   │
+        │  WAF block findings │
+        └─────────────────────┘
 
 
 FLOW 3: KEY MANAGEMENT (Admin Operation)
@@ -357,7 +378,7 @@ FLOW 3: KEY MANAGEMENT (Admin Operation)
 ┌──────────────┐
 │  Admin User  │
 └──────┬───────┘
-       │ [K1] POST /key/generate
+       │ [K1] POST https://licenseportal.aiengineering.co.uk/key/generate
        │      Authorization: Bearer MASTER_KEY
        │      Body: { user_id, team_id, limits, budget, models }
        ▼
@@ -417,12 +438,22 @@ FLOW 4: MONITORING & ALERTING
           │ [M5] Aggregation   │                     │
           └────────────────────┴─────────────────────┘
                                │
-                               │ [M6] Alarm triggers
+                               │ [M6] Alarm triggers / findings
                                ▼
                     ┌────────────────────────┐
                     │  CloudWatch Dashboard  │
                     │  • Real-time metrics   │
                     │  • Visual monitoring   │
+                    └───────────┬────────────┘
+                                │
+                                │ [M7] Security findings forwarded
+                                ▼
+                    ┌────────────────────────┐
+                    │  AWS Security Hub      │
+                    │  • Aggregated findings │
+                    │  • Compliance scores   │
+                    │  • CIS Benchmarks      │
+                    │  • FSBP standards      │
                     └────────────────────────┘
 
 
@@ -482,7 +513,7 @@ DATA STORES & PERSISTENCE
 │  │ Structure:                                                │ │
 │  │ s3://llmlite-audit-logs-{account}/                       │ │
 │  │   └── audit/                                             │ │
-│  │       └── 2026/02/23/                                    │ │
+│  │       └── 2026/03/05/                                    │ │
 │  │           ├── request-{timestamp}-{request-id}.json      │ │
 │  │           └── ...                                        │ │
 │  │                                                           │ │
@@ -512,8 +543,8 @@ ENCRYPTION & SECURITY DATA FLOW
 └────────────────┘        └────────────────────────────────┘
 
       [E4] TLS 1.3 Encryption (In Transit)
-      • User → WAF → ALB: HTTPS (TLS 1.3)
-      • ALB → Fargate: HTTP (internal VPC)
+      • User → WAF → ALB: HTTPS (TLS 1.3) via licenseportal.aiengineering.co.uk
+      • ALB → Fargate: HTTP (internal VPC, security-group controlled)
       • Fargate → RDS: SSL/TLS (PostgreSQL SSL mode)
       • Fargate → Bedrock: HTTPS (via NAT → IGW)
 
@@ -579,10 +610,10 @@ sequenceDiagram
     participant RDS as RDS PostgreSQL
     participant Bedrock as AWS Bedrock
     
-    User->>WAF: POST /v1/chat/completions (Authorization: Bearer sk-...)
+    User->>WAF: POST https://licenseportal.aiengineering.co.uk/v1/chat/completions
     WAF->>WAF: Inspect request against rule groups
     WAF->>ALB: Forward allowed request
-    ALB->>LiteLLM: Forward HTTPS request
+    ALB->>LiteLLM: Forward request (TLS terminated)
     LiteLLM->>RDS: Validate virtual key (SELECT query)
     RDS->>LiteLLM: Key valid + user metadata
     LiteLLM->>LiteLLM: Check rate limit
@@ -614,20 +645,20 @@ sequenceDiagram
 │  │  • AWSManagedRulesAmazonIpReputationList                    │  │
 │  │  • Rate-based rule: 2,000 req/5min per IP                   │  │
 │  │  • Geo blocking rule (configurable)                         │  │
-│  │  • WAF logs → CloudWatch / S3                               │  │
+│  │  • WAF logs → CloudWatch / S3 → Security Hub               │  │
 │  └────────────────────┬─────────────────────────────────────────┘  │
 │                       │                                             │
 │  ┌─────────────────────▼────────  PUBLIC SUBNET  ───────────────┐  │
 │  │                                                               │  │
 │  │  ┌──────────────────────────────────────────────────────┐   │  │
 │  │  │   Application Load Balancer (ALB)                    │   │  │
-│  │  │   • Public HTTPS Endpoint (port 443)                 │   │  │
-│  │  │   • HTTP → HTTPS Redirect (port 80)                  │   │  │
+│  │  │   • licenseportal.aiengineering.co.uk (HTTPS only)   │   │  │
 │  │  │   • ACM SSL/TLS Certificate                          │   │  │
 │  │  │   • Connection Draining: 30s                         │   │  │
 │  │  │   • Idle Timeout: 60s                                │   │  │
 │  │  │   • Health Check: /health (200 OK)                   │   │  │
 │  │  │   • Target: Fargate Tasks (port 4000)                │   │  │
+│  │  │   • SG: alb-sg (443 from internet-facing WAF only)   │   │  │
 │  │  └──────────────────────────────────────────────────────┘   │  │
 │  │           │                                                   │  │
 │  └───────────┼───────────────────────────────────────────────────┘  │
@@ -642,6 +673,9 @@ sequenceDiagram
 │  │  │   │  • 2 GB RAM     │  │  • 2 GB RAM     │          │    │  │
 │  │  │   │  • Port 4000    │  │  • Port 4000    │          │    │  │
 │  │  │   │  • LiteLLM      │  │  • LiteLLM      │          │    │  │
+│  │  │   │  • SG: fargate- │  │  • SG: fargate- │          │    │  │
+│  │  │   │    sg (4000     │  │    sg (4000     │          │    │  │
+│  │  │   │    from alb-sg) │  │    from alb-sg) │          │    │  │
 │  │  │   └─────────────────┘  └─────────────────┘          │    │  │
 │  │  │   Auto-scaling: 2-5 tasks (CPU > 70% scales up)     │    │  │
 │  │  └─────────────────────────────────────────────────────┘    │  │
@@ -655,6 +689,9 @@ sequenceDiagram
 │  │  │   • 20 GB storage    │    │   • CloudWatch       │       │  │
 │  │  │   • Auto backup      │    └──────────────────────┘       │  │
 │  │  │   • Port 5432        │                                    │  │
+│  │  │   • SG: rds-sg       │                                    │  │
+│  │  │     (5432 from       │                                    │  │
+│  │  │      fargate-sg)     │                                    │  │
 │  │  └──────────────────────┘                                    │  │
 │  └───────────────────────────────────────────────────────────────┘  │
 │                                                                     │
@@ -668,6 +705,15 @@ sequenceDiagram
 │  │  │  • Claude 3    │  │  • KMS Encrypt │  │  • Dashboards  │  │  │
 │  │  │    Opus        │  └────────────────┘  │  • Alarms      │  │  │
 │  │  └────────────────┘                      └────────────────┘  │  │
+│  │                                                               │  │
+│  │  ┌────────────────────────────────────────────────────────┐  │  │
+│  │  │  AWS Security Hub                                      │  │  │
+│  │  │  • Aggregated findings (WAF, GuardDuty, Inspector,    │  │  │
+│  │  │    Config, CloudTrail, IAM Access Analyser)           │  │  │
+│  │  │  • CIS AWS Foundations Benchmark                      │  │  │
+│  │  │  • AWS Foundational Security Best Practices (FSBP)   │  │  │
+│  │  │  • Compliance score dashboard                         │  │  │
+│  │  └────────────────────────────────────────────────────────┘  │  │
 │  └───────────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -698,6 +744,26 @@ Region: eu-west-2 (Single AWS Account)
 │   │   ├── CloudWatch Log Group: aws-waf-logs-llmlite
 │   │   └── S3 Bucket: llmlite-waf-logs-{account-id}
 │   └── Metrics: Enabled (CloudWatch namespace: AWS/WAFV2)
+│       └── Findings forwarded to: AWS Security Hub
+│
+├── AWS Security Hub
+│   ├── Enabled Standards:
+│   │   ├── CIS AWS Foundations Benchmark v1.4
+│   │   └── AWS Foundational Security Best Practices (FSBP)
+│   ├── Integrated Services:
+│   │   ├── Amazon GuardDuty (threat detection findings)
+│   │   ├── Amazon Inspector (container vulnerability findings)
+│   │   ├── AWS Config (configuration compliance findings)
+│   │   ├── AWS WAF (block/allow findings via CloudWatch)
+│   │   ├── AWS IAM Access Analyser (external access findings)
+│   │   └── AWS CloudTrail (API activity findings)
+│   ├── Custom Insights:
+│   │   ├── High-severity findings by resource type
+│   │   ├── Failed compliance checks by standard
+│   │   └── New findings in last 24 hours
+│   └── Findings Destinations:
+│       ├── CloudWatch Events (for automated remediation)
+│       └── S3 export (llmlite-audit-logs-{account-id}/security-hub/)
 │
 ├── VPC: llmlite-vpc (10.1.0.0/20)
 │   │
@@ -726,9 +792,9 @@ Region: eu-west-2 (Single AWS Account)
 │   │   └── Database RT: No internet access (local only)
 │   │
 │   └── Security Groups
-│       ├── alb-sg: Allow 80, 443 from 0.0.0.0/0
-│       ├── fargate-sg: Allow 4000 from alb-sg
-│       └── rds-sg: Allow 5432 from fargate-sg
+│       ├── alb-sg: Allow 443 inbound from internet (WAF-fronted), 4000 outbound to fargate-sg
+│       ├── fargate-sg: Allow 4000 from alb-sg inbound, 5432 outbound to rds-sg, 443 outbound to AWS services
+│       └── rds-sg: Allow 5432 from fargate-sg inbound only
 │
 ├── RDS PostgreSQL
 │   ├── DB Identifier: llmlite-postgres
@@ -764,9 +830,10 @@ Region: eu-west-2 (Single AWS Account)
 │   ├── Subnets: public-subnet-2a, public-subnet-2b
 │   ├── Security Group: alb-sg
 │   ├── WAF WebACL: llmlite-waf-acl (associated)
+│   ├── Domain: licenseportal.aiengineering.co.uk
+│   ├── Certificate: ACM (licenseportal.aiengineering.co.uk)
 │   ├── Listeners:
-│   │   ├── HTTPS:443 → Target Group (llmlite-tg)
-│   │   └── HTTP:80 → Redirect to HTTPS
+│   │   └── HTTPS:443 → Target Group (llmlite-tg)
 │   └── Target Group: llmlite-tg
 │       ├── Protocol: HTTP
 │       ├── Port: 4000
@@ -777,7 +844,8 @@ Region: eu-west-2 (Single AWS Account)
 │   ├── llmlite-audit-logs-{account-id}
 │   │   ├── Versioning: Enabled
 │   │   ├── Encryption: KMS (llmlite-key)
-│   │   └── Lifecycle: Archive to Glacier after 90 days
+│   │   ├── Lifecycle: Archive to Glacier after 90 days
+│   │   └── Prefix: security-hub/ (Security Hub findings export)
 │   ├── llmlite-waf-logs-{account-id}
 │   │   ├── Versioning: Enabled
 │   │   ├── Encryption: KMS (llmlite-key)
@@ -811,11 +879,17 @@ Region: eu-west-2 (Single AWS Account)
 │       ├── RDSLowStorage (< 20%)
 │       └── WAFHighBlockRate (> 100 blocks/5min)
 │
+├── AWS Security Hub
+│   ├── Standards: CIS AWS Foundations Benchmark, FSBP
+│   ├── Integrations: GuardDuty, Inspector, Config, WAF, IAM Access Analyser
+│   ├── Findings exported to S3 (llmlite-audit-logs-{account-id}/security-hub/)
+│   └── CloudWatch Events rules for critical finding auto-remediation
+│
 ├── KMS
 │   └── Key: llmlite-key
-│       ├── Usage: S3, RDS, CloudWatch, WAF logs encryption
+│       ├── Usage: S3, RDS, CloudWatch, WAF logs, Security Hub exports encryption
 │       ├── Key Rotation: Enabled (annual)
-│       └── Key Policy: Restrict to LLMLite services
+│       └── Key Policy: Restrict to LLMLite services only
 │
 └── AWS Bedrock
     ├── Region: eu-west-2
@@ -858,6 +932,10 @@ Region: eu-west-2 (Single AWS Account)
 │  │  │  Resources:                                        │    │ │
 │  │  │  • Fargate Task 1: 10.1.11.10                     │    │ │
 │  │  │  • Fargate Task 3: 10.1.11.30                     │    │ │
+│  │  │  • SG: fargate-sg                                 │    │ │
+│  │  │    - Inbound: TCP 4000 from alb-sg                │    │ │
+│  │  │    - Outbound: TCP 5432 to rds-sg                 │    │ │
+│  │  │    - Outbound: TCP 443 to AWS services            │    │ │
 │  │  │                                                    │    │ │
 │  │  │  Route Table: private-rt-2a                       │    │ │
 │  │  │  • 10.1.0.0/20 → local                            │    │ │
@@ -871,6 +949,9 @@ Region: eu-west-2 (Single AWS Account)
 │  │  │                                                    │    │ │
 │  │  │  Resources:                                        │    │ │
 │  │  │  • RDS Primary: 10.1.21.10                        │    │ │
+│  │  │  • SG: rds-sg                                     │    │ │
+│  │  │    - Inbound: TCP 5432 from fargate-sg only       │    │ │
+│  │  │    - Outbound: None                               │    │ │
 │  │  │                                                    │    │ │
 │  │  │  Route Table: database-rt                         │    │ │
 │  │  │  • 10.1.0.0/20 → local                            │    │ │
@@ -903,6 +984,10 @@ Region: eu-west-2 (Single AWS Account)
 │  │  │  Resources:                                        │    │ │
 │  │  │  • Fargate Task 2: 10.1.12.10                     │    │ │
 │  │  │  • Fargate Task 4: 10.1.12.30                     │    │ │
+│  │  │  • SG: fargate-sg                                 │    │ │
+│  │  │    - Inbound: TCP 4000 from alb-sg                │    │ │
+│  │  │    - Outbound: TCP 5432 to rds-sg                 │    │ │
+│  │  │    - Outbound: TCP 443 to AWS services            │    │ │
 │  │  │                                                    │    │ │
 │  │  │  Route Table: private-rt-2b                       │    │ │
 │  │  │  • 10.1.0.0/20 → local                            │    │ │
@@ -916,6 +1001,9 @@ Region: eu-west-2 (Single AWS Account)
 │  │  │                                                    │    │ │
 │  │  │  Resources:                                        │    │ │
 │  │  │  • RDS Standby: 10.1.22.10                        │    │ │
+│  │  │  • SG: rds-sg                                     │    │ │
+│  │  │    - Inbound: TCP 5432 from fargate-sg only       │    │ │
+│  │  │    - Outbound: None                               │    │ │
 │  │  │                                                    │    │ │
 │  │  │  Route Table: database-rt                         │    │ │
 │  │  │  • 10.1.0.0/20 → local                            │    │ │
@@ -934,9 +1022,10 @@ Region: eu-west-2 (Single AWS Account)
 │  │  llmlite-postgres.xxxxxx.eu-west-2.rds.amazonaws.com        │ │
 │  │  • Resolves to: 10.1.21.10 (primary) or 10.1.22.10 (standby)│ │
 │  │                                                              │ │
-│  │  ALB DNS:                                                   │ │
-│  │  llmlite-alb-xxxxxxxx.eu-west-2.elb.amazonaws.com           │ │
-│  │  • Resolves to: 10.1.1.10 and 10.1.2.10                    │ │
+│  │  Public DNS (Route 53 / external DNS):                      │ │
+│  │  licenseportal.aiengineering.co.uk                          │ │
+│  │  • CNAME → llmlite-alb-xxxxxxxx.eu-west-2.elb.amazonaws.com │ │
+│  │  • Resolves to ALB nodes: 10.1.1.10 and 10.1.2.10          │ │
 │  └──────────────────────────────────────────────────────────────┘ │
 └────────────────────────────────────────────────────────────────────┘
 
@@ -976,12 +1065,14 @@ CIDR Block Summary:
 │     │  • Rate-based rule → Block >2,000 req/5min per IP  │   │
 │     │                                                     │   │
 │     │ If any rule matches → HTTP 403 Forbidden (blocked) │   │
+│     │ WAF block events forwarded to Security Hub         │   │
 │     │ If no rules match  → Request forwarded to ALB      │   │
 │     └─────────────────────────────────────────────────────┘   │
 │                                                                 │
 │  1. Admin generates virtual key                                │
 │     ┌─────────────────────────────────────────────────────┐   │
-│     │ POST /key/generate                                  │   │
+│     │ POST https://licenseportal.aiengineering.co.uk      │   │
+│     │      /key/generate                                  │   │
 │     │ {                                                   │   │
 │     │   "user_id": "john.doe@company.com",               │   │
 │     │   "team_id": "engineering",                        │   │
@@ -998,7 +1089,8 @@ CIDR Block Summary:
 │                                                                 │
 │  2. User makes API request with virtual key                    │
 │     ┌─────────────────────────────────────────────────────┐   │
-│     │ POST /v1/chat/completions                           │   │
+│     │ POST https://licenseportal.aiengineering.co.uk      │   │
+│     │      /v1/chat/completions                           │   │
 │     │ Authorization: Bearer sk-1234...abcd                │   │
 │     │ Content-Type: application/json                      │   │
 │     │                                                     │   │
@@ -1053,6 +1145,7 @@ CIDR Block Summary:
 | Default Action | Allow |
 | Metrics | Enabled (CloudWatch namespace: AWS/WAFV2) |
 | Sampled Requests | Enabled |
+| Security Hub Integration | Enabled (findings forwarded via CloudWatch Events) |
 
 **Managed Rule Groups:**
 
@@ -1074,6 +1167,7 @@ CIDR Block Summary:
 - Log Fields: Timestamp, action, client IP, URI, terminating rule, rule group list
 - Redacted Fields: Authorization header (to prevent virtual key exposure in logs)
 - Encryption: KMS (llmlite-key)
+- Security Hub: Block events forwarded via CloudWatch Events rules
 
 **CloudWatch Metrics (AWS/WAFV2 namespace):**
 - AllowedRequests
@@ -1085,8 +1179,79 @@ CIDR Block Summary:
 - `wafv2:AssociateWebACL` — to associate WebACL with ALB
 - `wafv2:GetWebACL`, `wafv2:ListWebACLs` — for read access
 - `logs:CreateLogDelivery` — for WAF log delivery to CloudWatch
+- `securityhub:BatchImportFindings` — for forwarding findings to Security Hub
 
-### 4.2 LiteLLM Proxy Server
+### 4.2 AWS Security Hub
+
+**Purpose:** Provide centralised, continuous security posture management by aggregating findings from integrated AWS security services, running compliance checks against industry standards, and enabling automated or manual remediation workflows.
+
+**Configuration:**
+
+| Setting | Value |
+|---------|-------|
+| Region | eu-west-2 |
+| Enabled Standards | CIS AWS Foundations Benchmark v1.4, AWS Foundational Security Best Practices (FSBP) |
+| Auto-enable new controls | Enabled |
+| Findings export | S3 (llmlite-audit-logs-{account-id}/security-hub/) |
+| Encryption | KMS (llmlite-key) |
+
+**Integrated Services:**
+
+| Service | Finding Type | Purpose |
+|---------|-------------|---------|
+| Amazon GuardDuty | Threat detection | Unusual API calls, compromised credentials, network anomalies |
+| Amazon Inspector | Vulnerability assessment | Container image CVEs, Fargate task vulnerabilities |
+| AWS Config | Configuration compliance | Resource configuration drift against security baselines |
+| AWS WAF v2 | Block events | High-volume block events, potential DDoS activity |
+| AWS IAM Access Analyser | External access | Unintended public or cross-account resource access |
+| AWS CloudTrail | API activity | Suspicious API call patterns, root account usage |
+
+**Compliance Standards:**
+
+CIS AWS Foundations Benchmark v1.4 checks include:
+- IAM password policy enforcement
+- MFA enabled for root and IAM users
+- CloudTrail enabled and log file validation active
+- VPC flow logs enabled
+- Security group rules reviewed (no unrestricted inbound access)
+- S3 bucket public access blocked
+- KMS key rotation enabled
+- RDS instances not publicly accessible
+
+AWS Foundational Security Best Practices (FSBP) checks include:
+- ECS task definitions not using privileged containers
+- RDS encryption at rest enabled
+- ALB HTTPS listeners configured (no HTTP)
+- WAF WebACL associated with ALB
+- Secrets Manager rotation enabled
+- CloudWatch alarms configured for root account usage
+
+**Custom Insights:**
+
+| Insight Name | Filter | Purpose |
+|-------------|--------|---------|
+| High Severity Findings | Severity: CRITICAL or HIGH, RecordState: ACTIVE | Prioritise immediate remediation |
+| Failed Compliance Checks | Type: Software and Configuration Checks, ComplianceStatus: FAILED | Track compliance posture |
+| New Findings Last 24h | CreatedAt: last 24 hours, RecordState: ACTIVE | Daily security review |
+| WAF Block Findings | ProductName: WAF, Type: TTPs | Monitor attack patterns |
+
+**Automated Remediation (via CloudWatch Events):**
+
+| Finding | Automated Action |
+|---------|-----------------|
+| S3 bucket public access enabled | Trigger Lambda to re-apply block public access policy |
+| Security group unrestricted inbound (0.0.0.0/0 on sensitive ports) | Alert via CloudWatch Alarm; flag for manual review |
+| Root account console login | Alert via CloudWatch Alarm; notify security team |
+| GuardDuty: UnauthorizedAccess finding | Alert via CloudWatch Alarm; notify security team |
+
+**IAM Permissions Required:**
+- `securityhub:EnableSecurityHub` — initial enablement
+- `securityhub:BatchImportFindings` — for integrated services to submit findings
+- `securityhub:GetFindings`, `securityhub:ListInsights` — for read access
+- `s3:PutObject` on audit logs bucket — for findings export
+- `kms:GenerateDataKey`, `kms:Decrypt` — for encrypted findings export
+
+### 4.3 LiteLLM Proxy Server
 
 **Purpose:** OpenAI-compatible API gateway with virtual key authentication and rate limiting
 
@@ -1095,10 +1260,11 @@ CIDR Block Summary:
 | Setting | Value |
 |---------|-------|
 | Container Port | 4000 |
-| Protocol | HTTP (ALB handles HTTPS) |
+| Protocol | HTTP (ALB handles HTTPS termination) |
 | Base Image | ghcr.io/berriai/litellm:main-latest |
 | Health Check | /health |
 | Admin Endpoint | /key/generate, /key/delete, /key/info |
+| Public Endpoint | https://licenseportal.aiengineering.co.uk |
 
 **Key Features:**
 - Virtual key generation and management
@@ -1116,7 +1282,7 @@ CIDR Block Summary:
 - LITELLM_LOG: INFO
 - STORE_MODEL_IN_DB: true
 
-### 4.3 Application Load Balancer (ALB)
+### 4.4 Application Load Balancer (ALB)
 
 **Purpose:** HTTPS endpoint, SSL termination, request routing
 
@@ -1132,6 +1298,8 @@ CIDR Block Summary:
 | WAF WebACL | llmlite-waf-acl (associated) |
 | Deletion Protection | Enabled (production) |
 | Access Logs | S3 bucket (optional) |
+| Domain | licenseportal.aiengineering.co.uk |
+| Certificate | ACM (licenseportal.aiengineering.co.uk) — valid SSL |
 
 **Listeners:**
 
@@ -1139,16 +1307,13 @@ CIDR Block Summary:
 - Protocol: HTTPS
 - Port: 443
 - SSL Policy: ELBSecurityPolicy-TLS13-1-2-2021-06
-- Certificate: ACM certificate (*.your-domain.com)
+- Certificate: ACM certificate (licenseportal.aiengineering.co.uk)
 - Default Action: Forward to llmlite-tg
 - Rules:
   - Path: /health → Forward to llmlite-tg (public health check)
   - Path: /* → Forward to llmlite-tg (requires virtual key)
 
-**HTTP Listener (Port 80):**
-- Protocol: HTTP
-- Port: 80
-- Default Action: Redirect to HTTPS (301)
+> **Note:** HTTP (port 80) listener has been removed. All traffic must use HTTPS via `licenseportal.aiengineering.co.uk`. DNS records should point this hostname to the ALB via CNAME or Alias record.
 
 **Target Group (llmlite-tg):**
 - Name: llmlite-tg
@@ -1168,7 +1333,7 @@ CIDR Block Summary:
 - Deregistration Delay: 30 seconds
 - Stickiness: Disabled
 
-### 4.4 RDS PostgreSQL (Virtual Keys Storage)
+### 4.5 RDS PostgreSQL (Virtual Keys Storage)
 
 **Purpose:** Store virtual keys, user metadata, and usage tracking with ACID compliance
 
@@ -1192,7 +1357,7 @@ CIDR Block Summary:
 
 **Network Configuration:**
 - Subnets: database-subnet-2a, database-subnet-2b
-- Security Group: rds-sg (allows 5432 from fargate-sg only)
+- Security Group: rds-sg (allows TCP 5432 from fargate-sg only; no inbound from 0.0.0.0/0)
 - Public Access: No (private only)
 - Endpoint: llmlite-postgres.xxxxxx.eu-west-2.rds.amazonaws.com
 
@@ -1204,7 +1369,7 @@ litellm_db
 Tables Created by LiteLLM:
 
 
-### 4.5 LiteLLM Container (Fargate)
+### 4.6 LiteLLM Container (Fargate)
 
 **Purpose:** Run LiteLLM proxy server in containerized environment
 
@@ -1242,6 +1407,7 @@ Tables Created by LiteLLM:
 - logs:CreateLogStream, logs:PutLogEvents
 - s3:PutObject (audit logs bucket)
 - kms:Decrypt, kms:GenerateDataKey
+- securityhub:BatchImportFindings (for application-level findings)
 
 **ECS Service Configuration:**
 - Service Name: llmlite-service
@@ -1269,7 +1435,7 @@ Tables Created by LiteLLM:
 - Scale In Cooldown: 300 seconds
 - Scale Out Cooldown: 60 seconds
 
-### 4.6 Amazon Bedrock
+### 4.7 Amazon Bedrock
 
 **Purpose:** Anthropic Claude model hosting and inference
 
@@ -1350,43 +1516,46 @@ Destination       Target
 - Name: llmlite-alb-sg
 - VPC: llmlite-vpc
 - Inbound Rules:
-  - HTTPS (TCP 443) from 0.0.0.0/0 - Allow HTTPS from internet (WAF inspects before ALB)
-  - HTTP (TCP 80) from 0.0.0.0/0 - Allow HTTP (redirect to HTTPS)
+  - HTTPS (TCP 443) from 0.0.0.0/0 — Allow HTTPS from internet (all inbound traffic is pre-screened by AWS WAF v2 before reaching the ALB; WAF is the enforcement boundary, not the security group)
 - Outbound Rules:
-  - Custom TCP (Port 4000) to fargate-sg - Forward to Fargate tasks
+  - Custom TCP (Port 4000) to fargate-sg — Forward to Fargate tasks only
 
 **Fargate Security Group (fargate-sg):**
 - Name: llmlite-fargate-sg
 - VPC: llmlite-vpc
 - Inbound Rules:
-  - Custom TCP (Port 4000) from alb-sg - Allow traffic from ALB only
+  - Custom TCP (Port 4000) from alb-sg — Allow traffic from ALB security group only
 - Outbound Rules:
-  - HTTPS (TCP 443) to 0.0.0.0/0 - Allow outbound to AWS services (Bedrock)
-  - PostgreSQL (TCP 5432) to rds-sg - Database access
+  - HTTPS (TCP 443) to 0.0.0.0/0 — Allow outbound to AWS services (Bedrock, S3, CloudWatch via NAT)
+  - PostgreSQL (TCP 5432) to rds-sg — Database access to RDS security group only
 
 **RDS Security Group (rds-sg):**
 - Name: llmlite-rds-sg
 - VPC: llmlite-vpc
 - Inbound Rules:
-  - PostgreSQL (TCP 5432) from fargate-sg - Allow database access from Fargate only
+  - PostgreSQL (TCP 5432) from fargate-sg — Allow database access from Fargate security group only
 - Outbound Rules:
-  - None (database doesn't initiate outbound connections)
+  - None (database does not initiate outbound connections)
+
+> **Security Note:** All inter-component traffic references security groups rather than CIDR ranges. This ensures rules remain accurate as task IPs change due to auto-scaling or redeployment, and enforces strict least-privilege network access between tiers.
 
 ### 5.3 Network Flow
 
 **Inbound Traffic (User → Claude):**
 ```
 User Workstation
-    ↓ HTTPS:443 (Internet)
+    ↓ HTTPS:443 to licenseportal.aiengineering.co.uk (Internet)
 AWS WAF v2 (Regional WebACL: llmlite-waf-acl)
-    ↓ Inspect & allow/block request
+    ↓ Inspect & allow/block request; findings → Security Hub
 Internet Gateway
     ↓
 Application Load Balancer (Public Subnet: 10.1.1.10, 10.1.2.10)
-    ↓ HTTP:4000
+    ↓ alb-sg: inbound 443 from internet; outbound 4000 to fargate-sg
 Fargate Task - LiteLLM Proxy (Private Subnet: 10.1.11.10, 10.1.12.10)
+    ↓ fargate-sg: inbound 4000 from alb-sg; outbound 5432 to rds-sg
     ↓ Validate virtual key
 RDS PostgreSQL (Database Subnet: 10.1.21.10)
+    ↓ rds-sg: inbound 5432 from fargate-sg only
     ↓ TCP:5432 (SELECT query)
 Fargate Task - Key validated
     ↓ HTTPS:443 (via NAT Gateway: 10.1.1.20 or 10.1.2.20)
@@ -1397,9 +1566,9 @@ AWS Bedrock API (eu-west-2)
 
 **Database Connection Flow:**
 ```
-LiteLLM Proxy (Private Subnet)
+LiteLLM Proxy (Private Subnet) — fargate-sg
     ↓ TCP:5432 (within VPC - no internet)
-RDS PostgreSQL (Database Subnet: 10.1.21.10)
+RDS PostgreSQL (Database Subnet: 10.1.21.10) — rds-sg
     ↓ SQL Query (SELECT, UPDATE, INSERT)
 PostgreSQL Engine processes query
     ↓ Return result set
@@ -1432,10 +1601,14 @@ Fargate Task (Private Subnet)
 Internet Gateway
     ↓
 CloudWatch Logs (AWS Service Endpoint)
+    ↓
+Security Hub (findings aggregation)
 
 AWS WAF v2
     ↓ Near real-time log delivery
 CloudWatch Logs (aws-waf-logs-llmlite) + S3 (llmlite-waf-logs-{account-id})
+    ↓
+Security Hub (WAF block findings)
 ```
 
 ---
@@ -1457,6 +1630,7 @@ CloudWatch Logs (aws-waf-logs-llmlite) + S3 (llmlite-waf-logs-{account-id})
 │  │  • Optional geo-blocking                                │   │
 │  │  • WAF logs to CloudWatch and S3                        │   │
 │  │  • Authorization header redacted from WAF logs          │   │
+│  │  • Block findings forwarded to Security Hub             │   │
 │  └─────────────────────────────────────────────────────────┘   │
 │                                                                 │
 │  Layer 1: AUTHENTICATION & AUTHORIZATION                       │
@@ -1473,7 +1647,8 @@ CloudWatch Logs (aws-waf-logs-llmlite) + S3 (llmlite-waf-logs-{account-id})
 │  Layer 2: NETWORK SECURITY                                     │
 │  ┌─────────────────────────────────────────────────────────┐   │
 │  │  • VPC Isolation (RFC1918 private addressing)           │   │
-│  │  • Security Groups (least privilege)                    │   │
+│  │  • Security Groups referencing security groups          │   │
+│  │    (no 0.0.0.0/0 for inter-component traffic)          │   │
 │  │  • Network ACLs (stateless firewall)                    │   │
 │  │  • Private Subnets (no direct internet access)          │   │
 │  │  • Database Subnets (isolated, no internet)             │   │
@@ -1483,6 +1658,7 @@ CloudWatch Logs (aws-waf-logs-llmlite) + S3 (llmlite-waf-logs-{account-id})
 │  Layer 3: TRANSPORT SECURITY                                   │
 │  ┌─────────────────────────────────────────────────────────┐   │
 │  │  • TLS 1.3 (ALB to client)                              │   │
+│  │  • HTTPS only via licenseportal.aiengineering.co.uk     │   │
 │  │  • ACM Certificate Management                           │   │
 │  │  • Strong Cipher Suites Only                            │   │
 │  │  • HTTP Strict Transport Security (HSTS)                │   │
@@ -1496,7 +1672,7 @@ CloudWatch Logs (aws-waf-logs-llmlite) + S3 (llmlite-waf-logs-{account-id})
 │  │  • Budget Enforcement (cost control)                    │   │
 │  │  • PII Detection & Blocking                             │   │
 │  │  • Input Validation                                     │   │
-│  │  • Container Image Scanning                             │   │
+│  │  • Container Image Scanning (Amazon Inspector)          │   │
 │  │  • SQL Injection Prevention (parameterized queries)     │   │
 │  └─────────────────────────────────────────────────────────┘   │
 │                                                                 │
@@ -1511,11 +1687,16 @@ CloudWatch Logs (aws-waf-logs-llmlite) + S3 (llmlite-waf-logs-{account-id})
 │  │  • Database credentials in Secrets Manager              │   │
 │  └─────────────────────────────────────────────────────────┘   │
 │                                                                 │
-│  Layer 6: MONITORING & AUDIT                                   │
+│  Layer 6: POSTURE MANAGEMENT & AUDIT (AWS Security Hub)        │
 │  ┌─────────────────────────────────────────────────────────┐   │
+│  │  • Security Hub (centralised findings aggregation)      │   │
+│  │  • CIS AWS Foundations Benchmark compliance             │   │
+│  │  • AWS Foundational Security Best Practices (FSBP)     │   │
+│  │  • GuardDuty (threat detection)                         │   │
+│  │  • Inspector (container vulnerability scanning)         │   │
 │  │  • CloudTrail (all API calls logged)                    │   │
 │  │  • VPC Flow Logs (network traffic)                      │   │
-│  │  • WAF Logs (allowed/blocked requests)                  │   │
+│  │  • WAF Logs (allowed/blocked requests → Security Hub)  │   │
 │  │  • Application Logs (requests/responses)                │   │
 │  │  • RDS Logs (connections, queries, errors)              │   │
 │  │  • Immutable Audit Logs (S3)                            │   │
@@ -1534,6 +1715,7 @@ CloudWatch Logs (aws-waf-logs-llmlite) + S3 (llmlite-waf-logs-{account-id})
 0. AWS WAF v2 inspects incoming HTTP request
    ↓ Block if: IP reputation match, OWASP rule match,
      known bad input, or rate limit exceeded (403)
+   ↓ Block events forwarded to Security Hub
    ↓ Allow if: no matching rules
 1. User Application prepares HTTP request
    ↓
@@ -1542,12 +1724,12 @@ CloudWatch Logs (aws-waf-logs-llmlite) + S3 (llmlite-waf-logs-{account-id})
    - Content-Type: application/json
    ↓
 3. Request sent to ALB
-   - HTTPS POST /v1/chat/completions
+   - HTTPS POST https://licenseportal.aiengineering.co.uk/v1/chat/completions
    - TLS 1.3 encrypted connection
    ↓
 4. ALB forwards to LiteLLM Proxy
-   - SSL termination at ALB
-   - HTTP to Fargate task
+   - SSL termination at ALB (ACM certificate)
+   - HTTP to Fargate task (fargate-sg allows 4000 from alb-sg)
    ↓
 5. LiteLLM extracts virtual key from Authorization header
    - Parse "Bearer sk-1234...abcd"
@@ -1556,6 +1738,7 @@ CloudWatch Logs (aws-waf-logs-llmlite) + S3 (llmlite-waf-logs-{account-id})
 6. LiteLLM queries RDS PostgreSQL for key metadata
    - SQL: SELECT * FROM litellm_verificationtoken WHERE token = $1
    - Returns: user_id, rate_limits, budget, allowed_models, expires
+   - Connection via fargate-sg → rds-sg (TCP 5432)
    ↓
 7. LiteLLM validates key and enforces policies
    - Key exists and is_active = true?
@@ -1579,6 +1762,7 @@ CloudWatch Logs (aws-waf-logs-llmlite) + S3 (llmlite-waf-logs-{account-id})
    
 If WAF blocks request:
    - HTTP 403 Forbidden (before reaching application)
+   - Finding forwarded to Security Hub
 
 If validation fails:
    - HTTP 401 Unauthorized (invalid/expired key)
@@ -1627,6 +1811,7 @@ WAF logs can be queried via CloudWatch Logs Insights to identify blocked request
 - Group by `terminatingRuleId` to identify which rule is triggering most blocks
 - Filter by `httpRequest.clientIp` to investigate specific IP addresses
 - Monitor the `BlockedRequests` CloudWatch metric for anomaly detection
+- Review WAF block findings in Security Hub for consolidated threat view
 
 **Tuning WAF Rules:**
 
@@ -1648,10 +1833,11 @@ For known trusted IP ranges (e.g., corporate egress IPs):
 
 **Database Access Control:**
 - Private subnets only (no public access)
-- Security group allows 5432 only from fargate-sg
+- Security group rds-sg allows TCP 5432 only from fargate-sg (no CIDR-based rules)
 - IAM database authentication (optional)
 - Master password stored in AWS Secrets Manager
 - Automatic password rotation enabled
+- Security Hub FSBP check: RDS instances not publicly accessible
 
 **Data Protection:**
 - Encryption at rest using KMS (llmlite-key)
@@ -1668,19 +1854,20 @@ For known trusted IP ranges (e.g., corporate egress IPs):
   - error.log (error messages)
   - slowquery.log (slow queries > 1s)
 - CloudWatch Alarms for CPU, memory, connections, storage
+- Security Hub FSBP findings for RDS configuration compliance
 
 ### 6.6 Encryption
 
 **In Transit:**
 - TLS 1.3 for all internet-facing connections
 - ALB SSL/TLS Policy: `ELBSecurityPolicy-TLS13-1-2-2021-06`
-- Certificate from AWS Certificate Manager (ACM)
-- HTTPS only (HTTP redirects to HTTPS)
+- Certificate from AWS Certificate Manager (ACM) — licenseportal.aiengineering.co.uk
+- HTTPS only (no HTTP listener configured)
 - SSL/TLS for RDS connections (enforced)
 
 **At Rest:**
 - RDS PostgreSQL: Encryption with KMS (SSE-KMS)
-- S3: Server-side encryption with KMS (SSE-KMS) — including WAF log bucket
+- S3: Server-side encryption with KMS (SSE-KMS) — including WAF log bucket and Security Hub export bucket prefix
 - CloudWatch Logs: Encrypted with KMS — including WAF log group
 - ECS task storage: EBS encryption enabled
 - RDS backups: Encrypted with same KMS key
@@ -1693,6 +1880,7 @@ The KMS key policy allows:
 - RDS, S3, and CloudWatch Logs services to decrypt and generate data keys
 - ECS task role to decrypt and generate data keys
 - WAF log delivery service to encrypt log data
+- Security Hub findings export to encrypt data
 - Restrict usage to LLMLite services only
 
 ### 6.7 IAM Roles and Policies
@@ -1712,6 +1900,7 @@ This role allows the LiteLLM application to:
 - Write application logs to CloudWatch
 - Decrypt data using KMS key
 - Access Secrets Manager for RDS credentials
+- Submit application-level findings to Security Hub
 
 **RDS IAM Policy:**
 
@@ -1756,6 +1945,7 @@ LiteLLM tracks usage in PostgreSQL and rejects requests when limits are exceeded
 - Bedrock models deployed in eu-west-2
 - RDS data remains in eu-west-2
 - WAF WebACL is regional (eu-west-2)
+- Security Hub enabled in eu-west-2 only
 - Single AWS account architecture
 
 **Audit Requirements:**
@@ -1764,6 +1954,7 @@ LiteLLM tracks usage in PostgreSQL and rejects requests when limits are exceeded
 - WAF logs written to CloudWatch and S3
 - CloudTrail enabled for AWS API calls
 - RDS query logs enabled (slow queries)
+- Security Hub findings exported to S3
 - Log retention: 90 days minimum
 - Per-key usage tracking in PostgreSQL
 
@@ -1781,6 +1972,7 @@ LiteLLM tracks usage in PostgreSQL and rejects requests when limits are exceeded
 - Point-in-time recovery capability
 - Multi-AZ for high availability
 - Encryption at rest and in transit
+- Security Hub FSBP: RDS encryption and access controls validated continuously
 
 ---
 
@@ -1801,6 +1993,8 @@ Daily operations include:
 - Check database connections (current vs max)
 - **Review WAF BlockedRequests metric for anomalous spikes**
 - **Check WAF logs for any false positive blocks against legitimate traffic**
+- **Review AWS Security Hub summary dashboard for new CRITICAL or HIGH findings**
+- **Check Security Hub compliance score for any newly failed controls**
 
 **RDS-Specific Checks:**
 - Review RDS Performance Insights for slow queries
@@ -1833,23 +2027,30 @@ Daily operations include:
    - Assess whether any blocked requests appear to be false positives
    - Review AWS Managed Rule Group update notices and assess impact
 
-4. **Database Maintenance:**
+4. **Security Hub Review:**
+   - Review new findings since last week, filtered by severity (CRITICAL, HIGH)
+   - Track compliance score trends for CIS Benchmark and FSBP standards
+   - Review and action any newly failed compliance controls
+   - Check automated remediation actions triggered during the week
+   - Assign ownership to unresolved findings via Security Hub workflow
+
+5. **Database Maintenance:**
    - Review slow query log in RDS Performance Insights
    - Check for missing indexes (query optimization)
    - Verify backup retention policy
    - Review database connection pool utilization
    - Check for long-running transactions
 
-5. **Log Rotation:**
+6. **Log Rotation:**
    - Verify S3 lifecycle policies working (audit logs and WAF logs)
    - Check CloudWatch Logs retention
    - Archive old logs if needed
    - Review RDS log file sizes
 
-6. **Security Review:**
+7. **Security Review:**
    - Review CloudTrail logs for suspicious activity
-   - Check Security Hub findings
-   - Review unusual usage patterns (spikes, anomalies)
+   - Review Security Hub findings from GuardDuty and Inspector
+   - Check unusual usage patterns (spikes, anomalies)
    - Audit database access logs
 
 ### 7.3 Monthly Maintenance
@@ -1871,28 +2072,35 @@ Daily operations include:
    - Review geo-blocking configuration if enabled
    - Test WAF rules against sample requests in Count mode before applying changes
 
-3. **Database Optimization:**
+3. **Security Hub Review:**
+   - Review overall compliance score against CIS and FSBP baselines
+   - Identify top recurring finding types and address root causes
+   - Review and suppress known false positives with documented justification
+   - Update automated remediation rules based on new finding patterns
+   - Export monthly findings report from S3 for audit records
+
+4. **Database Optimization:**
    - Run VACUUM ANALYZE on PostgreSQL tables
    - Review and optimize slow queries
    - Add indexes if needed (based on query patterns)
    - Review table statistics and update if stale
    - Check for table bloat and fragmentation
 
-4. **Capacity Planning:**
+5. **Capacity Planning:**
    - Review auto-scaling metrics (Fargate and RDS)
    - Analyze peak usage patterns
    - Adjust min/max task counts if needed
    - Review RDS instance class (upgrade if needed)
    - Review database storage auto-scaling threshold
 
-5. **Backup and Recovery:**
+6. **Backup and Recovery:**
    - Test RDS snapshot restoration (quarterly)
    - Verify S3 audit logs and WAF logs intact
    - Test infrastructure restore from Terraform
    - Document any configuration changes
    - Update disaster recovery runbook
 
-6. **Cost Optimization:**
+7. **Cost Optimization:**
    - Review Bedrock usage by model
    - Identify high-usage users
    - Consider adjusting rate limits or budgets
@@ -1904,13 +2112,15 @@ Daily operations include:
 **Quarterly Review:**
 
 1. **Security Audit:**
-   - Run AWS Security Hub assessment
+   - Run AWS Security Hub full assessment report
    - Review IAM policies and roles
    - Audit virtual key usage logs
    - Review VPC Flow Logs for anomalies
    - Database security audit (user permissions)
+   - **Review Security Hub compliance score trends over the quarter**
    - **Review WAF effectiveness: block rate trends, false positive rate, rule coverage**
    - **Consider adding additional WAF rule groups based on emerging threats**
+   - **Review Security Hub integrated services for new available integrations**
    - Penetration testing (if required)
 
 2. **Disaster Recovery Test:**
@@ -1946,7 +2156,7 @@ Daily operations include:
 **Generating a New Key (Admin Operation):**
 
 Admins generate new virtual keys using the master key:
-1. Call POST /key/generate with master key in Authorization header
+1. Call POST https://licenseportal.aiengineering.co.uk/key/generate with master key in Authorization header
 2. Specify user details, rate limits, budget, allowed models
 3. LiteLLM inserts record into PostgreSQL (litellm_verificationtoken table)
 4. PostgreSQL transaction committed (ACID guarantee)
@@ -1986,7 +2196,7 @@ The deployment process includes:
 5. Update task definition with new image tag
 6. Deploy via ECS service update (rolling deployment, zero downtime)
 7. Monitor deployment progress
-8. Test API functionality after update
+8. Test API functionality after update — verify https://licenseportal.aiengineering.co.uk/health returns 200 OK
 9. Monitor RDS connections and query performance
 10. Rollback to previous version if issues detected
 
@@ -2037,6 +2247,7 @@ Point-in-time recovery:
 | ThrottledRequests | Custom/LiteLLM | > 50/hr | Review rate limits |
 | BlockedRequests | AWS/WAFV2 | > 100/5min | Investigate attack or false positives |
 | AllowedRequests | AWS/WAFV2 | Sudden drop | Check WAF misconfiguration |
+| SecurityHubFindings | AWS/SecurityHub | New CRITICAL | Immediate review and remediation |
 
 **RDS-Specific Metrics:**
 - FreeableMemory: Available RAM for database
@@ -2051,6 +2262,12 @@ Point-in-time recovery:
 - BlockedRequests: Total requests blocked by WAF rules
 - CountedRequests: Requests matched by Count-mode rules
 - PassedRequests: Requests that passed all rule evaluations
+
+**Security Hub Metrics:**
+- Total active findings by severity (CRITICAL, HIGH, MEDIUM, LOW)
+- Failed compliance controls by standard (CIS, FSBP)
+- New findings in rolling 24-hour window
+- Mean time to resolve findings by severity
 
 ### 8.2 CloudWatch Dashboard
 
@@ -2067,6 +2284,12 @@ The dashboard includes widgets for:
 - **WAF Request Summary:** AllowedRequests vs BlockedRequests over time
 - **Top Blocked Rules:** Which rule groups are triggering the most blocks
 - **Block Rate %:** BlockedRequests / (AllowedRequests + BlockedRequests)
+
+**Security Hub Summary:**
+- **Active Findings by Severity:** Count of CRITICAL, HIGH, MEDIUM, LOW findings
+- **Compliance Score:** CIS Benchmark and FSBP pass/fail percentage
+- **New Findings (24h):** Recent finding count with link to Security Hub console
+- **Top Finding Types:** Most frequent finding categories
 
 **Database Metrics:**
 - **RDS CPU & Memory:** CPUUtilization, FreeableMemory, SwapUsage
@@ -2102,7 +2325,7 @@ Critical alarms configured:
    - Threshold: > 100 blocks in 5 minutes
    - Evaluation Periods: 1
    - Priority: HIGH
-   - Action: Investigate WAF logs for attack pattern or false positive
+   - Action: Investigate WAF logs for attack pattern or false positive; review Security Hub WAF findings
 
 2. **WAF AllowedRequests Drop:** Triggers when allowed requests drop suddenly (potential WAF misconfiguration)
    - Metric: AllowedRequests (AWS/WAFV2)
@@ -2111,69 +2334,82 @@ Critical alarms configured:
    - Priority: HIGH
    - Action: Review WAF rules for misconfiguration, check for outage
 
+**Security Hub Alarms:**
+
+3. **New Critical Security Hub Finding:** Triggers when a new CRITICAL severity finding is raised
+   - Source: Security Hub → CloudWatch Events → CloudWatch Alarm
+   - Priority: CRITICAL
+   - Action: Immediate review; follow Security Hub finding remediation guidance
+
+4. **Compliance Score Drop:** Triggers when CIS or FSBP compliance score drops below threshold
+   - Source: Security Hub compliance score metric
+   - Threshold: < 80% pass rate
+   - Priority: HIGH
+   - Action: Review newly failed controls in Security Hub; assign remediation owner
+
 **Application Alarms:**
 
-3. **High Error Rate:** Triggers when 5xx errors exceed 5% over 10 minutes
+5. **High Error Rate:** Triggers when 5xx errors exceed 5% over 10 minutes
    - Metric: HTTPCode_Target_5XX_Count / RequestCount
    - Threshold: > 5%
    - Evaluation Periods: 2
    - Priority: CRITICAL
 
-4. **High Latency:** Triggers when p95 response time exceeds 3 seconds
+6. **High Latency:** Triggers when p95 response time exceeds 3 seconds
    - Metric: TargetResponseTime (p95)
    - Threshold: > 3 seconds
    - Evaluation Periods: 2
    - Priority: HIGH
 
-5. **Unhealthy Targets:** Triggers when fewer than 1 healthy target exists
+7. **Unhealthy Targets:** Triggers when fewer than 1 healthy target exists
    - Metric: HealthyHostCount
    - Threshold: < 1
    - Evaluation Periods: 1
    - Priority: CRITICAL
 
-6. **High 401 Rate:** Triggers when 401 errors spike (invalid keys)
+8. **High 401 Rate:** Triggers when 401 errors spike (invalid keys)
    - Metric: HTTPCode_Target_4XX_Count (filtered for 401)
    - Threshold: > 50 in 5 minutes
    - Priority: MEDIUM
 
 **Database Alarms:**
 
-7. **RDS High CPU:** Triggers when database CPU exceeds 80%
+9. **RDS High CPU:** Triggers when database CPU exceeds 80%
    - Metric: CPUUtilization (RDS)
    - Threshold: > 80%
    - Evaluation Periods: 2
    - Priority: HIGH
    - Action: Consider scaling RDS instance
 
-8. **RDS Low Storage:** Triggers when free storage < 2 GB
-   - Metric: FreeStorageSpace
-   - Threshold: < 2 GB (2,000,000,000 bytes)
-   - Evaluation Periods: 1
-   - Priority: HIGH
-   - Action: Enable storage auto-scaling
+10. **RDS Low Storage:** Triggers when free storage < 2 GB
+    - Metric: FreeStorageSpace
+    - Threshold: < 2 GB (2,000,000,000 bytes)
+    - Evaluation Periods: 1
+    - Priority: HIGH
+    - Action: Enable storage auto-scaling
 
-9. **RDS High Connections:** Triggers when connections > 80% of max
-   - Metric: DatabaseConnections
-   - Threshold: > 80% of max_connections (default: 100)
-   - Evaluation Periods: 2
-   - Priority: MEDIUM
-   - Action: Check for connection leaks
+11. **RDS High Connections:** Triggers when connections > 80% of max
+    - Metric: DatabaseConnections
+    - Threshold: > 80% of max_connections (default: 100)
+    - Evaluation Periods: 2
+    - Priority: MEDIUM
+    - Action: Check for connection leaks
 
-10. **RDS High Latency:** Triggers when read or write latency > 100ms
+12. **RDS High Latency:** Triggers when read or write latency > 100ms
     - Metric: ReadLatency or WriteLatency
     - Threshold: > 100ms
     - Evaluation Periods: 3
     - Priority: MEDIUM
     - Action: Check slow queries in Performance Insights
 
-11. **RDS Replication Lag:** Triggers when Multi-AZ replica lag > 1 second
+13. **RDS Replication Lag:** Triggers when Multi-AZ replica lag > 1 second
     - Metric: ReplicaLag
     - Threshold: > 1000ms
     - Evaluation Periods: 2
     - Priority: HIGH
     - Action: Check network or database load
 
-12. **RDS Backup Failure:** Triggers when automated backup fails
+14. **RDS Backup Failure:** Triggers when automated backup fails
     - Metric: BackupRetentionPeriodStorageUsed
     - Threshold: No recent backup
     - Priority: CRITICAL
@@ -2227,6 +2463,17 @@ Filter for connection-related errors and count by time window
 
 **Deadlocks:**
 Filter for deadlock messages and display details
+
+**Security Hub Queries (via AWS Console or API):**
+
+**Active Critical Findings:**
+Filter Security Hub findings by Severity.Label = CRITICAL and RecordState = ACTIVE
+
+**Compliance Failures by Control:**
+Query Security Hub compliance findings grouped by ControlId to identify top failing controls
+
+**Findings by Resource:**
+Group active findings by ResourceId to identify most problematic resources
 
 **Database Usage:**
 
