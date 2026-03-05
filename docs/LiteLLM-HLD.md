@@ -1,7 +1,7 @@
 # LLMLite Gateway — High Level Design
 
-**Document Version:** 1.0
-**Date:** 27 February 2026
+**Document Version:** 1.1
+**Date:** 05 March 2026
 **Status:** Approved
 **Target Audience:** Technology & Business Architects
 
@@ -48,6 +48,7 @@ Teams requiring access to Claude LLMs face two key friction points:
 | Cost governance | Per-user and per-team spend budgets enforced at the gateway |
 | Usage visibility | All requests logged and tracked; cost attributed to individual keys |
 | Security | Multi-layer protection including WAF, network isolation, and encryption |
+| Security posture | AWS Security Hub provides centralised findings aggregation and compliance monitoring |
 | Availability | Multi-AZ deployment with automatic failover |
 | Compliance | All data remains within EU (London) — eu-west-2 |
 
@@ -55,7 +56,7 @@ Teams requiring access to Claude LLMs face two key friction points:
 
 | User Type | How They Interact |
 |---|---|
-| **Developers** | Desktop IDEs (Cursor, Continue.dev), scripts, and direct API calls using a virtual key |
+| **Developers** | Desktop IDEs (Cursor, Continue.dev, Claude Desktop), scripts, and direct API calls using a virtual key |
 | **IT Administrators** | Admin portal and API to manage users, keys, and usage |
 | **Business Stakeholders** | Usage dashboards and cost reporting |
 
@@ -102,7 +103,7 @@ The gateway exposes an **OpenAI-compatible API**. This means existing tools and 
 
 ### 4.1 Logical Architecture
 
-The solution is structured in four logical tiers:
+The solution is structured in five logical tiers:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -125,14 +126,20 @@ The solution is structured in four logical tiers:
 │  APPLICATION TIER (Private Subnets)                        │
 │  LiteLLM Proxy on AWS Fargate — key validation,            │
 │  rate limiting, request routing, usage tracking            │
-└───────────────────┬───────────────────┬─────────────────────┘
-                    │                   │
-     ┌──────────────▼──────┐     ┌──────▼──────────────────┐
-     │  DATA TIER          │     │  AI MODEL TIER          │
-     │  Aurora PostgreSQL  │     │  AWS Bedrock            │
-     │  Keys, users,       │     │  Claude 3.5 Sonnet      │
-     │  usage & spend      │     │  Claude 3 Opus          │
-     └─────────────────────┘     └─────────────────────────┘
+└───────────────┬───────────────────┬─────────────────────────┘
+                │                   │
+   ┌────────────▼────────┐   ┌──────▼──────────────────┐
+   │  DATA TIER          │   │  AI MODEL TIER          │
+   │  RDS PostgreSQL     │   │  AWS Bedrock            │
+   │  Keys, users,       │   │  Claude 3.5 Sonnet      │
+   │  usage & spend      │   │  Claude 3 Opus          │
+   └─────────────────────┘   └─────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│  SECURITY POSTURE TIER                                      │
+│  AWS Security Hub — centralised findings aggregation,      │
+│  compliance standards (CIS, FSBP), posture management      │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ### 4.2 Deployment Architecture
@@ -144,8 +151,9 @@ The solution is deployed in a single AWS account in **eu-west-2 (London)**, acro
 | Edge Protection | AWS WAF v2 | Regional — associated with ALB |
 | Load Balancing | Application Load Balancer | Public subnets — AZ 2a & 2b |
 | Application | LiteLLM on AWS Fargate (ECS) | Private subnets — AZ 2a & 2b |
-| Database | Aurora PostgreSQL Serverless v2 | Database subnets — AZ 2a & 2b |
+| Database | RDS PostgreSQL (db.t4g.small) | Database subnets — AZ 2a & 2b (Multi-AZ) |
 | AI Models | AWS Bedrock | eu-west-2 (managed service) |
+| Security Posture | AWS Security Hub | eu-west-2 (managed service) |
 
 ### 4.3 Network Segmentation
 
@@ -159,12 +167,14 @@ The VPC is divided into three isolated tiers, following defence-in-depth princip
 
 No component in the database tier can be reached from the internet, directly or indirectly.
 
+> **⚠️ CIDR Advisory:** The VPC CIDR of `10.1.0.0/20` covers `10.1.0.0 – 10.1.15.255`. The database subnets (`10.1.21.x`, `10.1.22.x`) fall outside this range. It is recommended to either expand the VPC CIDR to `10.1.0.0/16`, or re-address the database subnets to fall within the `/20` range (e.g. `10.1.13.0/24` and `10.1.14.0/24`). This must be confirmed before implementation.
+
 ### 4.4 Request Flow (Summary)
 
 A typical user request follows this path:
 
 1. **User** sends an HTTPS request with their virtual API key
-2. **AWS WAF** inspects the request — blocks malicious traffic, SQL injection, known exploits, and IP-based rate abuse
+2. **AWS WAF** inspects the request — blocks malicious traffic, SQL injection, known exploits, and IP-based rate abuse; block findings are forwarded to Security Hub
 3. **Load Balancer** terminates SSL and routes to an available application container
 4. **LiteLLM Gateway** validates the key, checks rate limits and budget, then forwards the request to Bedrock
 5. **Amazon Bedrock** processes the prompt and returns the Claude model response
@@ -185,9 +195,18 @@ AWS WAF sits in front of the load balancer and inspects every inbound request be
 - **Exploit signatures** — known bad input patterns
 - **Volume-based abuse** — rate limiting at the IP level (2,000 requests per 5 minutes)
 
-Any request matching these rules is blocked at the edge, before consuming application or database resources.
+Any request matching these rules is blocked at the edge, before consuming application or database resources. WAF block events are forwarded to AWS Security Hub for consolidated threat visibility. The Authorization header is redacted from WAF logs to prevent virtual key exposure.
 
-### 5.2 LiteLLM Proxy — Application Gateway
+### 5.2 AWS Security Hub — Security Posture Management
+
+AWS Security Hub provides centralised, continuous security posture management across the deployment. It aggregates findings from integrated AWS security services and runs automated compliance checks against industry standards:
+
+- **Compliance standards** — CIS AWS Foundations Benchmark v1.4 and AWS Foundational Security Best Practices (FSBP)
+- **Integrated services** — Amazon GuardDuty (threat detection), Amazon Inspector (container vulnerability scanning), AWS Config (configuration compliance), AWS WAF (block events), IAM Access Analyser, and CloudTrail
+- **Automated remediation** — CloudWatch Events rules trigger automated responses to specific finding types (e.g. S3 public access re-enabled, root account login)
+- **Findings export** — Security Hub findings are exported to S3 for long-term audit records
+
+### 5.3 LiteLLM Proxy — Application Gateway
 
 The core of the solution. LiteLLM is an open-source proxy server that provides:
 
@@ -199,30 +218,30 @@ The core of the solution. LiteLLM is an open-source proxy server that provides:
 
 It runs as containerised workloads on **AWS Fargate** (serverless containers), scaling automatically between 2 and 5 instances based on CPU load. There are no servers to manage.
 
-### 5.3 Aurora PostgreSQL — Data Store
+### 5.4 RDS PostgreSQL — Data Store
 
-All persistent state is stored in a fully managed Aurora PostgreSQL Serverless v2 database:
+All persistent state is stored in a fully managed RDS PostgreSQL (db.t4g.small) database:
 
 - **Virtual keys** — key metadata, limits, and status
 - **Users** — profiles and team assignments
 - **Usage records** — per-request spend and token consumption
 - **Configuration** — gateway settings
 
-Aurora Serverless v2 scales database capacity automatically with demand, and Multi-AZ deployment provides automatic failover with no data loss.
+RDS Multi-AZ deployment provides synchronous replication and automatic failover with minimal data loss. ACID-compliant transactions ensure data integrity for key management and usage tracking operations.
 
-### 5.4 Amazon Bedrock — AI Models
+### 5.5 Amazon Bedrock — AI Models
 
 AWS Bedrock provides fully managed access to Anthropic Claude models without requiring model infrastructure management. Models are invoked via the Fargate application using AWS IAM role-based credentials — end users never interact with Bedrock directly.
 
-### 5.5 Supporting Services
+### 5.6 Supporting Services
 
 | Service | Role |
 |---|---|
 | **Application Load Balancer** | HTTPS endpoint, SSL/TLS termination, health-based routing |
 | **AWS Certificate Manager** | Manages and auto-renews the SSL certificate |
 | **Amazon CloudWatch** | Logs, metrics, dashboards, and alerting |
-| **AWS KMS** | Encryption key management for data at rest |
-| **Amazon S3** | Long-term audit log and WAF log archive |
+| **AWS KMS** | Encryption key management for data at rest (including WAF logs and Security Hub exports) |
+| **Amazon S3** | Long-term audit log, WAF log archive, and Security Hub findings export |
 | **AWS Secrets Manager** | Secure storage of database credentials |
 
 ---
@@ -231,16 +250,17 @@ AWS Bedrock provides fully managed access to Anthropic Claude models without req
 
 ### 6.1 Security Layers
 
-Security is applied in depth across six layers:
+Security is applied in depth across seven layers:
 
 | Layer | Controls |
 |---|---|
-| **Edge** | AWS WAF — OWASP rules, IP reputation, rate limiting |
-| **Transport** | TLS 1.3 end-to-end; HTTPS-only (HTTP redirects enforced) |
+| **Edge** | AWS WAF — OWASP rules, IP reputation, rate limiting (2,000 req / 5 min per IP) |
+| **Transport** | TLS 1.3 end-to-end; HTTPS-only (no HTTP listener) |
 | **Network** | VPC isolation; private subnets; security groups on least-privilege principles; database with no internet path |
 | **Authentication** | Virtual key validation on every request; keys are revocable and have configurable expiry |
 | **Application** | Per-key rate limits and spend budgets; model access control; PII detection |
 | **Data** | Encryption at rest (KMS) for database, S3, and logs; automated backups; audit trail |
+| **Posture Management** | AWS Security Hub — CIS and FSBP compliance monitoring; aggregated findings from GuardDuty, Inspector, Config, WAF, and CloudTrail |
 
 ### 6.2 Access Control Model
 
@@ -250,15 +270,20 @@ Security is applied in depth across six layers:
 | **IT Administrator** | Master key — can create, revoke, and manage virtual keys; access to admin portal |
 | **AWS Services** | IAM roles with least-privilege policies; no human access to underlying infrastructure |
 
+**Standard User Limits:** 10,000 TPM / 100 RPM / $50 per month budget
+
+**Admin User Limits:** 100,000 TPM / 1,000 RPM / $500 per month budget
+
 ### 6.3 Compliance Posture
 
 | Requirement | Implementation |
 |---|---|
-| **Data Residency** | All data stored and processed in eu-west-2 (London). No cross-border transfers. |
-| **Audit Logging** | All API requests logged to CloudWatch and archived to S3. WAF activity logged separately. |
-| **Encryption** | All data encrypted at rest (KMS) and in transit (TLS 1.3). |
+| **Data Residency** | All data stored and processed in eu-west-2 (London). No cross-border transfers. WAF WebACL is regional. |
+| **Audit Logging** | All API requests logged to CloudWatch and archived to S3. WAF activity logged separately to CloudWatch and S3. |
+| **Encryption** | All data encrypted at rest (KMS) and in transit (TLS 1.3), including WAF logs and Security Hub exports. |
 | **Key Management** | AWS KMS with annual automatic rotation. |
 | **Access Audit** | AWS CloudTrail records all AWS API calls. Per-key usage tracked in PostgreSQL. |
+| **Compliance Standards** | CIS AWS Foundations Benchmark v1.4 and AWS FSBP continuously monitored via Security Hub. |
 | **Data Retention** | Audit logs retained for 90 days active, then archived to S3 Glacier for 7 years. |
 | **GDPR** | Key deletion removes all associated user data from the database. PII detection available. |
 
@@ -271,15 +296,16 @@ Security is applied in depth across six layers:
 | Component | HA Mechanism | Recovery Time |
 |---|---|---|
 | **Application (Fargate)** | Minimum 2 tasks across 2 AZs; auto-scaling; ALB health checks replace failed tasks | < 60 seconds |
-| **Database (Aurora)** | Multi-AZ with synchronous replication; automatic failover | 30–60 seconds (DNS failover) |
+| **Database (RDS PostgreSQL)** | Multi-AZ with synchronous replication; automatic failover | 30–60 seconds (DNS failover) |
 | **Load Balancer** | Deployed across 2 AZs natively | Transparent |
 | **WAF** | Regional service — AWS managed availability | Transparent |
+| **Security Hub** | Regional managed service — AWS managed availability | Transparent |
 
 ### 7.2 Backup & Recovery
 
 | Asset | Backup Method | Retention | RTO |
 |---|---|---|---|
-| **Aurora Database** | Automated daily backups + point-in-time recovery | 7 days | 15–30 minutes |
+| **RDS Database** | Automated daily backups + point-in-time recovery (7-day window) | 7 days | 15–30 minutes |
 | **Infrastructure** | Terraform state in versioned S3 bucket | Indefinite | 2–4 hours (full rebuild) |
 | **Audit Logs** | S3 with versioning | 7 years | Immediate |
 
@@ -289,7 +315,7 @@ In the event of an availability zone failure:
 
 - The **load balancer** automatically routes traffic to the healthy AZ
 - **Fargate** auto-scaling replaces any lost tasks in the remaining AZ
-- **Aurora** automatically promotes the standby instance (30–60 seconds)
+- **RDS** automatically promotes the standby instance (30–60 seconds, DNS endpoint updated automatically)
 - No manual intervention is required for AZ-level failures
 
 ---
@@ -301,11 +327,14 @@ In the event of an availability zone failure:
 | Activity | Frequency | Effort |
 |---|---|---|
 | Health & error log review | Daily | Low — dashboard review |
+| WAF block rate review | Daily | Low — CloudWatch metrics |
+| Security Hub findings review | Daily | Low — dashboard review |
 | Cost and usage reporting | Weekly | Low — automated queries |
 | Key management (add/revoke users) | As needed | Low — API or portal |
-| LiteLLM container patching | Monthly | Low — rolling deployment |
 | WAF rule review | Monthly | Low — metrics review |
+| LiteLLM container patching | Monthly | Low — rolling deployment |
 | Database performance review | Monthly | Low — Performance Insights |
+| Security Hub compliance review | Monthly | Medium — control remediation |
 | Security & IAM audit | Quarterly | Medium |
 | DR test | Quarterly | Medium |
 
@@ -313,20 +342,20 @@ In the event of an availability zone failure:
 
 Key automated alerts are configured for:
 
-- **Critical:** Unhealthy application targets; high 5xx error rate; RDS backup failure
-- **High:** High response latency (>3s p95); RDS high CPU or low storage; high WAF block rate
+- **Critical:** Unhealthy application targets; high 5xx error rate; RDS backup failure; new Critical Security Hub finding
+- **High:** High response latency (>3s p95); RDS high CPU or low storage; high WAF block rate (>100 blocks / 5 min); Security Hub compliance score drop below 80%
 - **Medium:** High authentication failure rate; database connection saturation; replication lag
 
-All alerts feed into **CloudWatch Dashboards** for real-time visibility across application, database, and WAF layers.
+All alerts feed into **CloudWatch Dashboards** for real-time visibility across application, database, WAF, and Security Hub layers.
 
 ### 8.3 User Onboarding
 
 Onboarding a new user is a two-step API process (or via the admin portal):
 
 1. Create user account — assigns them to a team and inherits team-level model access and budget
-2. Generate invitation link — user sets their password and receives their virtual key
+2. Generate virtual key — admin distributes key to user via a secure channel; user configures their IDE or application
 
-Bulk onboarding is supported via CSV upload or scripted API calls.
+Bulk onboarding is supported via scripted API calls against the /key/generate endpoint.
 
 ---
 
@@ -334,17 +363,18 @@ Bulk onboarding is supported via CSV upload or scripted API calls.
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| **Aurora deletion protection disabled** | Low | High | ⚠️ Enable deletion protection in production immediately |
+| **RDS deletion protection** | Low | High | ⚠️ Enable deletion protection in production before go-live |
 | **VPC CIDR range** | Low | Medium | ⚠️ Database subnets (`10.1.21.x`, `10.1.22.x`) fall outside the declared `/20` range — confirm addressing or expand VPC to `/16` before deployment |
 | **Single AWS account** | Low | High | All resources share one account — consider account-level separation for production vs non-production environments |
-| **WAF false positives** | Low | Medium | New WAF rules should be deployed in Count mode before Block mode; review regularly |
+| **WAF false positives** | Low | Medium | New WAF rules should be deployed in Count mode before Block mode; review logs regularly for legitimate traffic being blocked |
 | **LiteLLM open source dependency** | Medium | Medium | Monitor releases; container patching is a monthly operational task; pin to tested versions |
-| **Bedrock model availability** | Low | High | Claude models must be explicitly enabled in eu-west-2 via AWS Console before deployment |
+| **Bedrock model availability** | Low | High | Claude models must be explicitly enabled in eu-west-2 via the AWS Console before deployment |
 | **Cost overrun** | Medium | Medium | Per-key budgets enforced at gateway; CloudWatch alarms on spend; weekly reporting recommended |
+| **Security Hub findings backlog** | Medium | Medium | Assign ownership to findings weekly; suppress known false positives with documented justification to maintain a meaningful compliance score |
 
 ---
 
-*Document Version: 1.0*
-*Last Updated: 27 February 2026*
-*Next Review: 27 March 2026*
+*Document Version: 1.1*
+*Last Updated: 05 March 2026*
+*Next Review: 05 April 2026*
 *Classification: Internal — AI Engineering Lab (AIEL) / DSIT*
